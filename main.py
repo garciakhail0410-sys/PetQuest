@@ -48,7 +48,7 @@ def play_sound(sound):
 def start_classroom_ambience():
     if sfx_ambience:
         AMBIENCE_CHANNEL.play(sfx_ambience, loops=-1)
-        AMBIENCE_CHANNEL.set_volume(0.4)
+        AMBIENCE_CHANNEL.set_volume(vol_ambience)
 
 def stop_classroom_ambience():
     AMBIENCE_CHANNEL.stop()
@@ -169,6 +169,11 @@ CL_BROOM_HEAD  = (220, 190, 100)
 CL_SPARKLE     = (255, 240, 100)
 CL_PROGRESS_A  = (120, 220,  80)
 CL_PROGRESS_B  = ( 60, 160,  40)
+
+# ── Volume settings ───────────────────────────────────────────────────────────
+vol_music    = 0.3
+vol_sfx      = 1.0
+vol_ambience = 0.4
 
 # ── Load images ───────────────────────────────────────────────────────────────
 def load_bg(filename):
@@ -507,6 +512,96 @@ def draw_howto_popup(surf, anim_t):
     surf.blit(x_s, (howto_close_rect.centerx - x_s.get_width() // 2,
                     howto_close_rect.centery - x_s.get_height() // 2))
 
+# ── Settings popup ────────────────────────────────────────────────────────────
+show_settings            = False
+settings_anim            = 0.0
+SETTINGS_SPEED           = 0.12
+settings_close_rect      = pygame.Rect(0, 0, 0, 0)
+settings_dragging_slider = None   # "music" | "sfx" | "ambience" | None
+
+SPW_BASE = 480
+SPH_BASE = 340
+
+def draw_settings_popup(surf, anim_t):
+    global settings_close_rect, vol_music, vol_sfx, vol_ambience
+
+    overlay = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, int(170 * min(anim_t * 2, 1))))
+    surf.blit(overlay, (0, 0))
+
+    scale  = 0.6 + 0.4 * anim_t
+    spw_s  = int(SPW_BASE * scale)
+    sph_s  = int(SPH_BASE * scale)
+    spx    = SCREEN_W // 2 - spw_s // 2
+    spy    = SCREEN_H // 2 - sph_s // 2
+
+    panel = pygame.Surface((SPW_BASE, SPH_BASE), pygame.SRCALPHA)
+
+    # Background
+    pygame.draw.rect(panel, (30, 25, 50, 245), (0, 0, SPW_BASE, SPH_BASE), border_radius=22)
+    pygame.draw.rect(panel, (120, 90, 180, 255), (0, 0, SPW_BASE, SPH_BASE), 3, border_radius=22)
+
+    # Banner
+    banner_h = 54
+    pygame.draw.rect(panel, (45, 30, 80, 240), (0, 0, SPW_BASE, banner_h), border_radius=22)
+    pygame.draw.rect(panel, (45, 30, 80, 240), (0, banner_h // 2, SPW_BASE, banner_h // 2))
+    title_s = font_ft_title.render("Settings", True, (220, 195, 255))
+    panel.blit(title_s, (SPW_BASE // 2 - title_s.get_width() // 2,
+                          banner_h // 2 - title_s.get_height() // 2))
+
+    sliders = [
+        ("Music Volume",    vol_music,    "music"),
+        ("SFX Volume",      vol_sfx,      "sfx"),
+        ("Ambience Volume", vol_ambience, "ambience"),
+    ]
+    bar_x   = 60
+    bar_w   = SPW_BASE - 160
+    bar_h   = 18
+    start_y = 90
+    row_gap = 72
+
+    for si, (label, val, key) in enumerate(sliders):
+        by = start_y + si * row_gap
+
+        lbl_s = font_ft_body.render(label, True, (200, 175, 235))
+        panel.blit(lbl_s, (bar_x, by - 20))
+
+        # Track background
+        pygame.draw.rect(panel, (20, 15, 35), (bar_x, by, bar_w, bar_h), border_radius=9)
+
+        # Fill
+        fill_w = int(bar_w * val)
+        if fill_w > 0:
+            pygame.draw.rect(panel, (130, 90, 210), (bar_x, by, fill_w, bar_h), border_radius=9)
+
+        # Track border
+        pygame.draw.rect(panel, (100, 75, 160, 160), (bar_x, by, bar_w, bar_h), 2, border_radius=9)
+
+        # Knob
+        knob_x = bar_x + fill_w
+        knob_y = by + bar_h // 2
+        pygame.gfxdraw.filled_circle(panel, knob_x, knob_y, 11, (210, 185, 255, 230))
+        pygame.gfxdraw.aacircle(panel,     knob_x, knob_y, 11, (160, 130, 220, 255))
+
+        # Percentage label
+        pct_s = font_ft_hint.render(f"{int(val * 100)}%", True, (180, 155, 220))
+        panel.blit(pct_s, (bar_x + bar_w + 10,
+                            by + bar_h // 2 - pct_s.get_height() // 2))
+
+    scaled_panel = pygame.transform.smoothscale(panel, (spw_s, sph_s))
+    surf.blit(scaled_panel, (spx, spy))
+
+    # Close button
+    cs = 32
+    settings_close_rect = pygame.Rect(spx + spw_s - cs - 8, spy + 8, cs, cs)
+    close_hov = settings_close_rect.collidepoint(*pygame.mouse.get_pos())
+    col = (210, 70, 50) if close_hov else (170, 50, 30)
+    pygame.draw.circle(surf, col, settings_close_rect.center, settings_close_rect.w // 2)
+    pygame.draw.circle(surf, (255, 255, 255), settings_close_rect.center, settings_close_rect.w // 2, 2)
+    x_s = font_ft_body.render("X", True, WHITE)
+    surf.blit(x_s, (settings_close_rect.centerx - x_s.get_width() // 2,
+                    settings_close_rect.centery - x_s.get_height() // 2))
+
 # ── Landing buttons ───────────────────────────────────────────────────────────
 LW = 265; LH = 52
 LX = SCREEN_W - LW - 55
@@ -514,8 +609,9 @@ LY = int(SCREEN_H * 0.615)
 LG = int(SCREEN_H * 0.118)
 
 landing_buttons = [
-    {"id":"start", "label":"Start Game",  "icon":">", "rect":(LX, LY,      LW, LH), "col":BTN_GREEN,  "dark":BTN_GREEN_D,  "hover":BTN_GREEN_H},
-    {"id":"howto", "label":"How to Play", "icon":"?", "rect":(LX, LY + LG, LW, LH), "col":BTN_YELLOW, "dark":BTN_YELLOW_D, "hover":BTN_YELLOW_H},
+    {"id":"start",    "label":"Start Game",  "icon":">", "rect":(LX, LY,          LW, LH), "col":BTN_GREEN,  "dark":BTN_GREEN_D,  "hover":BTN_GREEN_H},
+    {"id":"settings", "label":"Settings",    "icon":"#", "rect":(LX, LY + LG,     LW, LH), "col":BTN_BLUE,   "dark":BTN_BLUE_D,   "hover":BTN_BLUE_H},
+    {"id":"howto",    "label":"How to Play", "icon":"?", "rect":(LX, LY + LG * 2, LW, LH), "col":BTN_YELLOW, "dark":BTN_YELLOW_D, "hover":BTN_YELLOW_H},
 ]
 
 # ── Map button colors ─────────────────────────────────────────────────────────
@@ -1555,7 +1651,8 @@ def ss_update(events, dt):
             ss_pause_t     = 0.45
             ss_phase       = "showing"
     elif ss_phase == "success":
-        ss_result_t -= dt
+        ss_success_t -= dt
+        ss_result_t  -= dt
         if ss_result_t <= 0:
             if ss_progress >= 1.0:
                 play_sound(sfx_task_complete)
@@ -1707,19 +1804,12 @@ def ss_draw(surf):
         err_s = pygame.Surface((PW, PH), pygame.SRCALPHA)
         err_s.fill((220, 50, 30, alpha))
         panel.blit(err_s, (0, 0))
+    # ── Subtle green flash on round success — no banner text ──────────────────
     if ss_success_t > 0:
-        ss_success_t_ref = ss_success_t
-        alpha = int(ss_success_t_ref / 0.6 * 90)
+        alpha = int(ss_success_t / 0.6 * 60)
         ok_s  = pygame.Surface((PW, PH), pygame.SRCALPHA)
         ok_s.fill((80, 220, 100, alpha))
         panel.blit(ok_s, (0, 0))
-        done_s  = font_ft_big.render("Round Clear!", True, (180, 255, 180))
-        done_sh = font_ft_big.render("Round Clear!", True, (0, 0, 0))
-        done_sh.set_alpha(55)
-        cx = PW // 2 - done_s.get_width() // 2
-        cy = PH // 2 - done_s.get_height() // 2
-        panel.blit(done_sh, (cx + 2, cy + 2))
-        panel.blit(done_s,  (cx, cy))
     scaled_panel = pygame.transform.smoothscale(panel, (int(PW * scale), int(PH * scale)))
     surf.blit(scaled_panel, (px, py))
     cs = 32
@@ -1738,21 +1828,21 @@ def ss_draw(surf):
 # ══════════════════════════════════════════════════════════════════════════════
 CL_PANEL_W       = 560
 CL_PANEL_H       = 430
-CL_NUM_PILES     = 6          # dirt piles to sweep away
-CL_SWEEP_RADIUS  = 48         # how close broom must be to clean a pile
-CL_BROOM_SPEED   = 340        # pixels/sec when following mouse
+CL_NUM_PILES     = 6
+CL_SWEEP_RADIUS  = 48
+CL_BROOM_SPEED   = 340
 
 cl_active        = False
 cl_progress      = 0.0
 cl_anim_t        = 0.0
 cl_close_rect    = pygame.Rect(0, 0, 0, 0)
 cl_flash_t       = 0.0
-cl_piles         = []         # list of {"x","y","cleaned","clean_t","wobble"}
+cl_piles         = []
 cl_broom_x       = 0.0
 cl_broom_y       = 0.0
-cl_sweeping      = False      # True while mouse button held inside panel
-cl_sparkles      = []         # decorative sparkle particles
-cl_panel_rect    = pygame.Rect(0, 0, 0, 0)   # screen-space panel rect
+cl_sweeping      = False
+cl_sparkles      = []
+cl_panel_rect    = pygame.Rect(0, 0, 0, 0)
 
 
 class _Sparkle:
@@ -1793,10 +1883,7 @@ def cl_open():
     cl_sweeping  = False
     cl_sparkles  = []
 
-    # Place dirt piles randomly inside the floor area of the panel
-    # floor area roughly: x 60..500, y 180..370 in panel-local coords
     cl_piles = []
-    margin   = 50
     fx1, fy1 = 70,  185
     fx2, fy2 = CL_PANEL_W - 70, CL_PANEL_H - 75
     placed = []
@@ -1805,7 +1892,6 @@ def cl_open():
         attempts += 1
         nx = random.randint(fx1, fx2)
         ny = random.randint(fy1, fy2)
-        # keep piles spread out
         too_close = any(math.hypot(nx - p["lx"], ny - p["ly"]) < 80 for p in placed)
         if not too_close:
             placed.append({"lx": nx, "ly": ny})
@@ -1813,12 +1899,11 @@ def cl_open():
                 "lx":      nx,
                 "ly":      ny,
                 "cleaned": False,
-                "clean_t": 0.0,   # shrink-out animation
+                "clean_t": 0.0,
                 "wobble":  random.uniform(0, math.pi * 2),
                 "size":    random.uniform(0.8, 1.3),
             })
 
-    # start broom in centre
     cl_broom_x = float(CL_PANEL_W // 2)
     cl_broom_y = float(CL_PANEL_H // 2)
 
@@ -1837,7 +1922,6 @@ def cl_update(events, dt):
     cl_flash_t = max(0.0, cl_flash_t - dt)
     cl_sparkles[:] = [s for s in cl_sparkles if s.update(dt)]
 
-    # Advance clean-out animations
     for pile in cl_piles:
         if pile["cleaned"]:
             pile["clean_t"] = min(1.0, pile["clean_t"] + dt * 4.0)
@@ -1859,9 +1943,7 @@ def cl_update(events, dt):
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
             cl_sweeping = False
 
-    # Move broom smoothly toward mouse when sweeping
     if cl_sweeping and cl_panel_rect.collidepoint(mx, my):
-        # Convert mouse to panel-local coords
         scale  = 0.55 + 0.45 * (1 - (1 - cl_anim_t) ** 3)
         local_mx = (mx - cl_panel_rect.x) / scale
         local_my = (my - cl_panel_rect.y) / scale
@@ -1877,7 +1959,6 @@ def cl_update(events, dt):
             cl_broom_x = local_mx
             cl_broom_y = local_my
 
-        # Check pile collisions
         for pile in cl_piles:
             if pile["cleaned"]:
                 continue
@@ -1886,13 +1967,11 @@ def cl_update(events, dt):
                 pile["cleaned"] = True
                 cl_flash_t = 0.28
                 for _ in range(random.randint(6, 11)):
-                    # sparkle at screen position
                     sx = cl_panel_rect.x + int(pile["lx"] * scale)
                     sy = cl_panel_rect.y + int(pile["ly"] * scale)
                     cl_sparkles.append(_Sparkle(sx, sy))
                 play_sound(sfx_click)
 
-    # Recalculate progress
     cleaned = sum(1 for p in cl_piles if p["cleaned"])
     cl_progress = cleaned / max(1, len(cl_piles))
 
@@ -1920,18 +1999,15 @@ def cl_draw(surf):
     py   = (SCREEN_H - ph_s) // 2
     cl_panel_rect = pygame.Rect(px, py, pw_s, ph_s)
 
-    # Dim overlay
     dim = pygame.Surface((SCREEN_W, SCREEN_H), pygame.SRCALPHA)
     dim.fill((0, 0, 0, int(165 * cl_anim_t)))
     surf.blit(dim, (0, 0))
 
     panel = pygame.Surface((PW, PH), pygame.SRCALPHA)
 
-    # Panel background — dark green classroom-y feel
     pygame.draw.rect(panel, (*CL_BG, 248), (0, 0, PW, PH), border_radius=20)
     pygame.draw.rect(panel, (80, 120, 60, 255), (0, 0, PW, PH), 3, border_radius=20)
 
-    # Banner
     banner_h = 54
     pygame.draw.rect(panel, (*CL_BANNER, 240), (0, 0, PW, banner_h), border_radius=20)
     pygame.draw.rect(panel, (*CL_BANNER, 240), (0, banner_h // 2, PW, banner_h // 2))
@@ -1939,7 +2015,6 @@ def cl_draw(surf):
     panel.blit(title_s, (PW // 2 - title_s.get_width() // 2,
                           banner_h // 2 - title_s.get_height() // 2))
 
-    # Progress bar
     bar_x, bar_y = 60, 68
     bar_w, bar_h = PW - 120, 20
     pygame.draw.rect(panel, (15, 30, 12), (bar_x, bar_y, bar_w, bar_h), border_radius=10)
@@ -1963,33 +2038,27 @@ def cl_draw(surf):
     pct_s = font_ft_hint.render(f"{cleaned_count}/{len(cl_piles)}", True, (160, 220, 100))
     panel.blit(pct_s, (bar_x + bar_w + 6, bar_y + bar_h // 2 - pct_s.get_height() // 2))
 
-    # Hint
     hint_s = font_ft_body.render("Hold & drag the broom over every dirt pile!", True, (160, 220, 120))
     panel.blit(hint_s, (PW // 2 - hint_s.get_width() // 2, 96))
 
-    # Floor area
     floor_rect = pygame.Rect(30, 160, PW - 60, PH - 200)
     pygame.draw.rect(panel, CL_FLOOR, floor_rect, border_radius=10)
-    # Floor planks — subtle lines
     for fy_line in range(floor_rect.top + 28, floor_rect.bottom, 28):
         pygame.draw.line(panel, CL_FLOOR_DARK,
                          (floor_rect.left + 4, fy_line),
                          (floor_rect.right - 4, fy_line), 1)
-    # Vertical grain
     for fxi in range(floor_rect.left + 80, floor_rect.right, 80):
         pygame.draw.line(panel, CL_FLOOR_DARK,
                          (fxi, floor_rect.top + 4),
                          (fxi, floor_rect.bottom - 4), 1)
     pygame.draw.rect(panel, CL_FLOOR_DARK, floor_rect, 2, border_radius=10)
 
-    # Dirt piles
     for pile in cl_piles:
         lx, ly = pile["lx"], pile["ly"]
         wobble  = math.sin(pile["wobble"]) * 2
         sz      = pile["size"]
 
         if pile["cleaned"]:
-            # shrink-out animation
             t   = pile["clean_t"]
             alpha_v = int(255 * (1 - t))
             scale_v = 1.0 - t * 0.8
@@ -2003,13 +2072,11 @@ def cl_draw(surf):
             pygame.draw.ellipse(pile_surf, (*CL_DIRT_DARK, alpha_v), (0, 0, pw2, ph2), 2)
             panel.blit(pile_surf, (int(lx - pw2 // 2), int(ly - ph2 // 2)))
         else:
-            # Pulsing idle pile
             pulse = abs(math.sin(pile["wobble"] * 0.7)) * 0.15 + 0.9
             pw2 = int(58 * sz * pulse)
             ph2 = int(26 * sz * pulse)
             pile_surf = pygame.Surface((pw2 + 4, ph2 + 4), pygame.SRCALPHA)
             pygame.draw.ellipse(pile_surf, (*CL_DIRT_COL, 230), (0, 0, pw2, ph2))
-            # Clump details
             for di in range(3):
                 cx2 = int(pw2 * (0.25 + di * 0.25))
                 cy2 = ph2 // 2
@@ -2019,7 +2086,6 @@ def cl_draw(surf):
             pygame.draw.ellipse(pile_surf, (*CL_DIRT_DARK, 200), (0, 0, pw2, ph2), 2)
             panel.blit(pile_surf, (int(lx - pw2 // 2 + wobble), int(ly - ph2 // 2)))
 
-            # Sweep ring hint
             ring_alpha = int(abs(math.sin(pygame.time.get_ticks() * 0.002 + pile["wobble"])) * 60 + 20)
             ring_r = int(CL_SWEEP_RADIUS * 0.75)
             ring_s = pygame.Surface((ring_r * 2 + 4, ring_r * 2 + 4), pygame.SRCALPHA)
@@ -2027,15 +2093,12 @@ def cl_draw(surf):
                                     (200, 240, 140, ring_alpha))
             panel.blit(ring_s, (lx - ring_r - 2, ly - ring_r - 2))
 
-    # Broom
     bx, by = int(cl_broom_x), int(cl_broom_y)
 
-    # Broom angle — tilt based on movement direction (simple wobble when sweeping)
     broom_angle = 0.0
     if cl_sweeping:
         broom_angle = math.sin(pygame.time.get_ticks() * 0.008) * 12
 
-    # Draw broom handle
     handle_len = 70
     handle_angle_rad = math.radians(-60 + broom_angle)
     hx2 = bx + int(math.cos(handle_angle_rad) * handle_len)
@@ -2043,7 +2106,6 @@ def cl_draw(surf):
     pygame.draw.line(panel, CL_BROOM_HDL, (bx, by), (hx2, hy2), 7)
     pygame.draw.circle(panel, (120, 75, 25), (hx2, hy2), 5)
 
-    # Broom head (trapezoid)
     head_w  = 52
     head_h  = 18
     head_angle = handle_angle_rad + math.pi / 2
@@ -2063,7 +2125,6 @@ def cl_draw(surf):
         pygame.draw.polygon(panel, CL_BROOM_HEAD, head_pts)
         pygame.draw.polygon(panel, (160, 130, 60), head_pts, 2)
 
-    # Bristles
     for bi in range(7):
         t_b  = bi / 6
         bsx = int(hcx + cos_h * (head_w // 2 - head_w * t_b))
@@ -2074,14 +2135,12 @@ def cl_draw(surf):
                          (bsx + int(math.cos(handle_angle_rad + math.pi) * 14 + bend),
                           bsy + int(math.sin(handle_angle_rad + math.pi) * 14 + bend)), 2)
 
-    # Flash overlay
     if cl_flash_t > 0:
         alpha = int(cl_flash_t / 0.28 * 75)
         fl = pygame.Surface((PW, PH), pygame.SRCALPHA)
         fl.fill((180, 255, 120, alpha))
         panel.blit(fl, (0, 0))
 
-    # Done label
     if cl_progress >= 1.0:
         done_s  = font_ft_big.render("All Clean!", True, (140, 255, 120))
         done_sh = font_ft_big.render("All Clean!", True, (0, 0, 0))
@@ -2091,20 +2150,16 @@ def cl_draw(surf):
         panel.blit(done_sh, (cx + 2, cy + 2))
         panel.blit(done_s,  (cx, cy))
 
-    # Hint while not sweeping
     if not cl_sweeping:
         sw_hint = font_ft_hint.render("Hold left mouse button and drag to sweep!", True, (140, 200, 100))
         panel.blit(sw_hint, (PW // 2 - sw_hint.get_width() // 2, PH - 30))
 
-    # Scale and blit
     scaled_panel = pygame.transform.smoothscale(panel, (pw_s, ph_s))
     surf.blit(scaled_panel, (px, py))
 
-    # Sparkles drawn in screen space
     for sp in cl_sparkles:
         sp.draw(surf)
 
-    # Close button
     cs = 32
     cl_close_rect = pygame.Rect(px + pw_s - cs - 8, py + 8, cs, cs)
     close_hov = cl_close_rect.collidepoint(*pygame.mouse.get_pos())
@@ -2294,7 +2349,6 @@ def _update_and_draw_teacher(surf, dt):
             teacher_state        = "patrolling"
             teacher_patrol_timer = random.uniform(TEACHER_PATROL_MIN, TEACHER_PATROL_MAX)
 
-        # ── player is busy if ANY minigame is open ──
         player_is_busy = (active_task is not None) or ft_active or wt_active or ss_active or wm_active or cl_active
         if player_is_busy and classroom_running and not teacher_caught_player:
             sus = getattr(_update_and_draw_teacher, '_sus', 0.0)
@@ -2338,7 +2392,6 @@ def _update_and_draw_teacher(surf, dt):
                 stop_warning_sound()
                 stop_task_music()
                 play_sound(sfx_lose)
-                # Force-close all tasks
                 ft_active   = False
                 wt_active   = False
                 ss_active   = False
@@ -2576,7 +2629,7 @@ def get_popup_close_rect():
 BACK_RECT = pygame.Rect(10, 10, 185, 36)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ── State machine ─────────────────────────────────────────────────────────────
+# ── State machine ─────────────────────────────────────────────────════════════
 # ══════════════════════════════════════════════════════════════════════════════
 state    = "landing"
 hov_land = None
@@ -2621,6 +2674,8 @@ while running:
         howto_anim = min(1.0, howto_anim + POPUP_SPEED)
     if show_locked and locked_anim < 1.0:
         locked_anim = min(1.0, locked_anim + LOCKED_SPEED)
+    if show_settings and settings_anim < 1.0:
+        settings_anim = min(1.0, settings_anim + SETTINGS_SPEED)
 
     for rid in list(click_flash.keys()):
         click_flash[rid] -= 1
@@ -2657,7 +2712,7 @@ while running:
             if event.type == pygame.QUIT:
                 running = False
 
-    elif wm_active:                                      # ← WHACK-A-MOLE
+    elif wm_active:
         wm_done, wm_cancelled = wm_update(events_this_frame, dt)
         if wm_done:
             tasks_done[3] = True
@@ -2665,7 +2720,7 @@ while running:
             if event.type == pygame.QUIT:
                 running = False
 
-    elif cl_active:                                      # ← CLEANUP
+    elif cl_active:
         cl_done, cl_cancelled = cl_update(events_this_frame, dt)
         if cl_done:
             tasks_done[4] = True
@@ -2678,8 +2733,37 @@ while running:
             if event.type == pygame.QUIT:
                 running = False
 
+            # ── Slider mouse motion ───────────────────────────────────────────
+            if event.type == pygame.MOUSEMOTION:
+                if show_settings and settings_dragging_slider:
+                    scale_s   = 0.6 + 0.4 * settings_anim
+                    bar_x_s   = 60
+                    bar_w_s   = SPW_BASE - 160
+                    spx_s     = SCREEN_W // 2 - int(SPW_BASE * scale_s) // 2
+                    for si, key in enumerate(["music", "sfx", "ambience"]):
+                        if settings_dragging_slider == key:
+                            track_x = spx_s + int(bar_x_s * scale_s)
+                            track_w = int(bar_w_s * scale_s)
+                            new_val = max(0.0, min(1.0, (mx - track_x) / max(1, track_w)))
+                            if key == "music":
+                                vol_music = new_val
+                                pygame.mixer.music.set_volume(new_val)
+                            elif key == "sfx":
+                                vol_sfx = new_val
+                                CLICK_CHANNEL.set_volume(new_val)
+                            elif key == "ambience":
+                                vol_ambience = new_val
+                                AMBIENCE_CHANNEL.set_volume(new_val)
+                            break
+
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                settings_dragging_slider = None
+
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                if show_locked:
+                if show_settings:
+                    show_settings = False
+                    settings_anim = 0.0
+                elif show_locked:
                     show_locked = False
                     locked_anim = 0.0
                 elif show_popup:
@@ -2700,7 +2784,57 @@ while running:
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 
-                if show_locked:
+                if show_settings:
+                    if settings_close_rect.collidepoint(mx, my):
+                        play_sound(sfx_click)
+                        show_settings = False
+                        settings_anim = 0.0
+                    else:
+                        # Check if clicking a slider track to start dragging
+                        scale_s   = 0.6 + 0.4 * settings_anim
+                        spw_s_now = int(SPW_BASE * scale_s)
+                        sph_s_now = int(SPH_BASE * scale_s)
+                        spx_s     = SCREEN_W // 2 - spw_s_now // 2
+                        spy_s     = SCREEN_H // 2 - sph_s_now // 2
+                        bar_x_s   = 60
+                        bar_w_s   = SPW_BASE - 160
+                        bar_h_s   = 18
+                        start_y_s = 90
+                        row_gap_s = 72
+                        hit_slider = False
+                        for si, key in enumerate(["music", "sfx", "ambience"]):
+                            by_s  = start_y_s + si * row_gap_s
+                            track = pygame.Rect(
+                                spx_s + int(bar_x_s * scale_s),
+                                spy_s + int(by_s    * scale_s),
+                                int(bar_w_s * scale_s),
+                                int(bar_h_s * scale_s) + 10,
+                            )
+                            if track.collidepoint(mx, my):
+                                settings_dragging_slider = key
+                                hit_slider = True
+                                # Immediately update value on click
+                                track_x = spx_s + int(bar_x_s * scale_s)
+                                track_w = int(bar_w_s * scale_s)
+                                new_val = max(0.0, min(1.0, (mx - track_x) / max(1, track_w)))
+                                if key == "music":
+                                    vol_music = new_val
+                                    pygame.mixer.music.set_volume(new_val)
+                                elif key == "sfx":
+                                    vol_sfx = new_val
+                                    CLICK_CHANNEL.set_volume(new_val)
+                                elif key == "ambience":
+                                    vol_ambience = new_val
+                                    AMBIENCE_CHANNEL.set_volume(new_val)
+                                break
+                        if not hit_slider:
+                            # Click outside panel closes it
+                            panel_rect_s = pygame.Rect(spx_s, spy_s, spw_s_now, sph_s_now)
+                            if not panel_rect_s.collidepoint(mx, my):
+                                show_settings = False
+                                settings_anim = 0.0
+
+                elif show_locked:
                     if locked_okay_rect.collidepoint(mx, my):
                         play_sound(sfx_click)
                         show_locked = False
@@ -2752,6 +2886,9 @@ while running:
                             if btn["id"] == "start":
                                 fade_transition(bg_landing, bg_map)
                                 state = "map"
+                            elif btn["id"] == "settings":
+                                show_settings = True
+                                settings_anim = 0.0
                             elif btn["id"] == "howto":
                                 show_howto = True
                                 howto_anim = 0.0
@@ -2818,9 +2955,9 @@ while running:
                                         wt_open()
                                     elif i == 2:
                                         ss_open()
-                                    elif i == 3:         # ← WHACK-A-MOLE
+                                    elif i == 3:
                                         wm_open()
-                                    elif i == 4:         # ← CLEANUP
+                                    elif i == 4:
                                         cl_open()
                                     else:
                                         active_task     = i
@@ -2863,17 +3000,23 @@ while running:
         else:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
-    elif wm_active:                                      # ← WHACK-A-MOLE cursor
+    elif wm_active:
         if wm_close_rect.collidepoint(mx, my):
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
         else:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
-    elif cl_active:                                      # ← CLEANUP cursor
+    elif cl_active:
         if cl_close_rect.collidepoint(mx, my):
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
         elif cl_panel_rect.collidepoint(mx, my):
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_CROSSHAIR)
+        else:
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
+
+    elif show_settings:
+        if settings_close_rect.collidepoint(mx, my):
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
         else:
             pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_ARROW)
 
@@ -2968,9 +3111,9 @@ while running:
             wt_draw(screen)
         elif ss_active:
             ss_draw(screen)
-        elif wm_active:                                  # ← WHACK-A-MOLE draw
+        elif wm_active:
             wm_draw(screen)
-        elif cl_active:                                  # ← CLEANUP draw
+        elif cl_active:
             cl_draw(screen)
         elif active_task is not None:
             task_popup_anim = min(1.0, task_popup_anim + TASK_POPUP_SPEED)
@@ -2990,13 +3133,14 @@ while running:
     if show_howto:
         draw_howto_popup(screen, howto_anim)
 
+    if show_settings:
+        draw_settings_popup(screen, settings_anim)
+
     if show_locked:
         draw_locked_popup(screen, locked_anim)
 
     pygame.display.flip()
     clock.tick(60)
-
-#comment maganda ako
 
 pygame.quit()
 sys.exit()
