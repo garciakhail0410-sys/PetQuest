@@ -95,7 +95,9 @@ def draw_sound_popup(surf, anim_t):
     global sound_dragging_slider, vol_music, vol_sfx, vol_ambience
     if anim_t <= 0:
         return {}
-    PW, PH = 244, 210
+    num_sliders = 2
+    PW = 244
+    PH = 36 + num_sliders * 48 + 34  # start_y + rows + mute button space
     scale  = 0.5 + 0.5 * min(anim_t, 1.0)
     pw_s   = int(PW * scale)
     ph_s   = int(PH * scale)
@@ -113,8 +115,8 @@ def draw_sound_popup(surf, anim_t):
     sliders = [
         ("Game Sound",    vol_music,    "music"),
         ("Button Clicks", vol_sfx,      "sfx"),
-        ("Classroom",     vol_ambience, "ambience"),
     ]
+
     bar_x   = 14
     bar_w   = PW - 88
     bar_h   = 12
@@ -127,8 +129,8 @@ def draw_sound_popup(surf, anim_t):
 
     # apply active drag live
     if sound_dragging_slider in ("music", "sfx", "ambience"):
-        if sound_dragging_slider == "ambience" and state != "classroom":
-            sound_dragging_slider = None
+        if False:
+            pass
         else:
             raw = max(0.0, min(1.0, (local_mx - bar_x) / max(1, bar_w)))
             if sound_dragging_slider == "music":
@@ -150,7 +152,7 @@ def draw_sound_popup(surf, anim_t):
         by  = start_y + si * row_gap
         by2 = by + 16
 
-        is_locked = (key == "ambience" and state != "classroom")
+        is_locked = False
         lbl_col = (130, 110, 160) if is_locked else (200, 175, 235)
         lbl_s = font_ft_hint.render(label, True, lbl_col)
         panel.blit(lbl_s, (bar_x, by))
@@ -2875,6 +2877,8 @@ while running:
         for event in events_this_frame:
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                sound_dragging_slider = None
 
     elif wt_active:
         wt_done, wt_cancelled = wt_update(events_this_frame, dt)
@@ -2907,6 +2911,8 @@ while running:
         for event in events_this_frame:
             if event.type == pygame.QUIT:
                 running = False
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                sound_dragging_slider = None
 
     else:
         for event in events_this_frame:
@@ -2965,20 +2971,27 @@ while running:
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 
-                if show_sound_popup:
-                    for _key in ("music", "sfx", "ambience"):
+                if MUTE_RECT.collidepoint(mx, my):
+                    toggle_sound_popup()
+
+                elif show_sound_popup:
+                    _slider_keys = [k for k in ("music", "sfx", "ambience") if k in _sound_popup_rects]
+                    _hit_slider = False
+                    for _key in _slider_keys:
                         _r = _sound_popup_rects.get(_key)
                         if _r and _r.collidepoint(mx, my):
                             sound_dragging_slider = _key
+                            _hit_slider = True
                             break
-                    else:
+                    if not _hit_slider:
                         _mr = _sound_popup_rects.get("mute")
                         if _mr and _mr.collidepoint(mx, my):
                             toggle_mute()
                         elif not _sound_popup_rects.get("panel", pygame.Rect(0,0,0,0)).collidepoint(mx, my):
                             show_sound_popup = False
                             sound_popup_anim = 0.0
-                if show_settings:
+
+                elif show_settings:
                     if settings_close_rect.collidepoint(mx, my):
                         play_sound(sfx_click)
                         show_settings = False
@@ -3090,6 +3103,22 @@ while running:
                 elif state == "classroom":
                     if MUTE_RECT.collidepoint(mx, my):
                         toggle_sound_popup()
+                    elif show_sound_popup:
+                        _slider_keys = [k for k in ("music", "sfx", "ambience") if k in _sound_popup_rects]
+                        _hit_slider = False
+                        for _key in _slider_keys:
+                            _r = _sound_popup_rects.get(_key)
+                            if _r and _r.collidepoint(mx, my):
+                                sound_dragging_slider = _key
+                                _hit_slider = True
+                                break
+                        if not _hit_slider:
+                            _mr = _sound_popup_rects.get("mute")
+                            if _mr and _mr.collidepoint(mx, my):
+                                toggle_mute()
+                            elif not _sound_popup_rects.get("panel", pygame.Rect(0,0,0,0)).collidepoint(mx, my):
+                                show_sound_popup = False
+                                sound_popup_anim = 0.0
                     elif teacher_caught_player and not classroom_running:
                         if caught_try_again_rect.width > 0 and caught_try_again_rect.collidepoint(mx, my):
                             play_sound(sfx_click)
