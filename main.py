@@ -81,15 +81,22 @@ def stop_task_music():
         task_music_playing = False
 
 # ── Mute toggle ───────────────────────────────────────────────────────────────
+
 def draw_mute_button(surf):
-    hov = MUTE_RECT.collidepoint(*pygame.mouse.get_pos())
-    bg  = (110, 80, 45) if hov else (80, 55, 30)
-    pygame.draw.rect(surf, bg, MUTE_RECT, border_radius=8)
-    pygame.draw.rect(surf, (180, 140, 60), MUTE_RECT, 2, border_radius=8)
-    symbol = "M" if is_muted else "S"
-    lbl = font_small.render(symbol, True, WHITE)
-    surf.blit(lbl, (MUTE_RECT.centerx - lbl.get_width() // 2,
-                    MUTE_RECT.centery - lbl.get_height() // 2))
+    if sound_btn_img:
+        alpha = 120 if is_muted else 255
+        img = sound_btn_img.copy()
+        img.set_alpha(alpha)
+        surf.blit(img, (MUTE_RECT.x, MUTE_RECT.y))
+    else:
+        hov = MUTE_RECT.collidepoint(*pygame.mouse.get_pos())
+        bg  = (110, 80, 45) if hov else (80, 55, 30)
+        pygame.draw.rect(surf, bg, MUTE_RECT, border_radius=8)
+        pygame.draw.rect(surf, (180, 140, 60), MUTE_RECT, 2, border_radius=8)
+        symbol = "M" if is_muted else "S"
+        lbl = font_small.render(symbol, True, WHITE)
+        surf.blit(lbl, (MUTE_RECT.centerx - lbl.get_width() // 2,
+                        MUTE_RECT.centery - lbl.get_height() // 2))
 
 def draw_sound_popup(surf, anim_t):
     global sound_dragging_slider, vol_music, vol_sfx, vol_ambience
@@ -254,6 +261,14 @@ screen = pygame.display.set_mode((SCREEN_W, SCREEN_H))
 pygame.display.set_caption("PetQuest: Secret Paws")
 clock = pygame.time.Clock()
 
+# ── Sound button image ────────────────────────────────────────────────────────
+SOUND_BTN_SIZE = 40
+if os.path.exists("soundbutton.png"):
+    _raw_snd_btn = pygame.image.load("soundbutton.png").convert_alpha()
+    sound_btn_img = pygame.transform.smoothscale(_raw_snd_btn, (SOUND_BTN_SIZE, SOUND_BTN_SIZE))
+else:
+    sound_btn_img = None
+
 # ── Colors ────────────────────────────────────────────────────────────────────
 WHITE = (255, 255, 255)
 
@@ -378,6 +393,12 @@ def load_sprite(filename, height):
 TEACHER_H = 180
 teacher_walk_img   = load_sprite("teacher_walk.png",   TEACHER_H)
 teacher_caught_img = load_sprite("teacher_caught.png", TEACHER_H)
+CHECK_ICON_SIZE = 165
+if os.path.exists("check.png"):
+    _raw_check = pygame.image.load("check.png").convert_alpha()
+    check_img  = pygame.transform.smoothscale(_raw_check, (CHECK_ICON_SIZE, CHECK_ICON_SIZE))
+else:
+    check_img = None
 
 # ── Load task frame image ─────────────────────────────────────────────────────
 def load_frame(filename, width):
@@ -2418,9 +2439,9 @@ def draw_classroom(surf, dt):
     surf.blit(t_surf, (tx,   ty))
 
     ICON_FRACS = [
-        (0.670, 0.360), (0.805, 0.370),
+        (0.675, 0.360), (0.805, 0.360),
         (0.670, 0.550), (0.805, 0.550),
-        (0.760, 0.880),
+        (0.740, 0.740),
     ]
     ICON_R = 34
     icons  = []
@@ -2437,11 +2458,17 @@ def draw_classroom(surf, dt):
             pygame.gfxdraw.filled_circle(glow, glow_r+2, glow_r+2, glow_r, (*GOLD, int(160*task_anim[i])))
             pygame.gfxdraw.aacircle(glow,     glow_r+2, glow_r+2, glow_r, (*GOLD, int(200*task_anim[i])))
             surf.blit(glow, (cx_i - glow_r - 2, cy_i - glow_r - 2))
-            chk    = font_timer.render("V", True, WHITE)
-            chk_sh = font_timer.render("V", True, (0, 0, 0))
-            chk_sh.set_alpha(80)
-            surf.blit(chk_sh, (cx_i - chk.get_width()//2 + 2, cy_i - chk.get_height()//2 + 2))
-            surf.blit(chk,    (cx_i - chk.get_width()//2,     cy_i - chk.get_height()//2))
+            if check_img:
+                alpha_surf = check_img.copy()
+                alpha_surf.set_alpha(int(255 * task_anim[i]))
+                surf.blit(alpha_surf, (cx_i - CHECK_ICON_SIZE // 2,
+                                       cy_i - CHECK_ICON_SIZE // 2))
+            else:
+                chk    = font_timer.render("V", True, WHITE)
+                chk_sh = font_timer.render("V", True, (0, 0, 0))
+                chk_sh.set_alpha(80)
+                surf.blit(chk_sh, (cx_i - chk.get_width()//2 + 2, cy_i - chk.get_height()//2 + 2))
+                surf.blit(chk,    (cx_i - chk.get_width()//2,     cy_i - chk.get_height()//2))
         else:
             pulse = abs(math.sin(pygame.time.get_ticks() * 0.003 + i)) * 0.5 + 0.5
             ring  = pygame.Surface((ICON_R*2+8, ICON_R*2+8), pygame.SRCALPHA)
