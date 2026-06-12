@@ -41,8 +41,9 @@ warning_sound_playing = False
 task_music_playing    = False
 
 def play_sound(sound):
-    if sound:
+    if sound and not is_muted:
         CLICK_CHANNEL.stop()
+        CLICK_CHANNEL.set_volume(vol_sfx)
         CLICK_CHANNEL.play(sound)
 
 def start_classroom_ambience():
@@ -78,6 +79,171 @@ def stop_task_music():
     if task_music_playing:
         TASK_CHANNEL.stop()
         task_music_playing = False
+
+# ── Mute toggle ───────────────────────────────────────────────────────────────
+def draw_mute_button(surf):
+    hov = MUTE_RECT.collidepoint(*pygame.mouse.get_pos())
+    bg  = (110, 80, 45) if hov else (80, 55, 30)
+    pygame.draw.rect(surf, bg, MUTE_RECT, border_radius=8)
+    pygame.draw.rect(surf, (180, 140, 60), MUTE_RECT, 2, border_radius=8)
+    symbol = "M" if is_muted else "S"
+    lbl = font_small.render(symbol, True, WHITE)
+    surf.blit(lbl, (MUTE_RECT.centerx - lbl.get_width() // 2,
+                    MUTE_RECT.centery - lbl.get_height() // 2))
+
+def draw_sound_popup(surf, anim_t):
+    global sound_dragging_slider, vol_music, vol_sfx, vol_ambience
+    if anim_t <= 0:
+        return {}
+    PW, PH = 244, 210
+    scale  = 0.5 + 0.5 * min(anim_t, 1.0)
+    pw_s   = int(PW * scale)
+    ph_s   = int(PH * scale)
+    px_s   = SCREEN_W - pw_s - 8
+    py_s   = MUTE_RECT.bottom + 6
+
+    panel = pygame.Surface((PW, PH), pygame.SRCALPHA)
+    pygame.draw.rect(panel, (28, 22, 48, 248), (0, 0, PW, PH), border_radius=14)
+    pygame.draw.rect(panel, (120, 90, 180, 255), (0, 0, PW, PH), 2, border_radius=14)
+    pygame.draw.rect(panel, (45, 30, 80, 240), (0, 0, PW, 28), border_radius=14)
+    pygame.draw.rect(panel, (45, 30, 80, 240), (0, 14, PW, 14))
+    t_lbl = font_small.render("VOLUME", True, (200, 175, 235))
+    panel.blit(t_lbl, (PW // 2 - t_lbl.get_width() // 2, 7))
+
+    sliders = [
+        ("Game Sound",    vol_music,    "music"),
+        ("Button Clicks", vol_sfx,      "sfx"),
+        ("Classroom",     vol_ambience, "ambience"),
+    ]
+    bar_x   = 14
+    bar_w   = PW - 88
+    bar_h   = 12
+    start_y = 36
+    row_gap = 48
+
+    mx_now, my_now = pygame.mouse.get_pos()
+    local_mx = (mx_now - px_s) / max(0.001, scale)
+    local_my = (my_now - py_s) / max(0.001, scale)
+
+    # apply active drag live
+    if sound_dragging_slider in ("music", "sfx", "ambience"):
+        if sound_dragging_slider == "ambience" and state != "classroom":
+            sound_dragging_slider = None
+        else:
+            raw = max(0.0, min(1.0, (local_mx - bar_x) / max(1, bar_w)))
+            if sound_dragging_slider == "music":
+                vol_music = raw
+                if not is_muted:
+                    pygame.mixer.music.set_volume(raw)
+                    TASK_CHANNEL.set_volume(raw * 0.5)
+            elif sound_dragging_slider == "sfx":
+                vol_sfx = raw
+                if not is_muted:
+                    CLICK_CHANNEL.set_volume(raw)
+                    WARNING_CHANNEL.set_volume(raw * 0.5)
+            elif sound_dragging_slider == "ambience":
+                vol_ambience = raw
+                if not is_muted:
+                    AMBIENCE_CHANNEL.set_volume(raw)
+
+    for si, (label, val, key) in enumerate(sliders):
+        by  = start_y + si * row_gap
+        by2 = by + 16
+
+        is_locked = (key == "ambience" and state != "classroom")
+        lbl_col = (130, 110, 160) if is_locked else (200, 175, 235)
+        lbl_s = font_ft_hint.render(label, True, lbl_col)
+        panel.blit(lbl_s, (bar_x, by))
+
+        if is_locked:
+            lock_s = font_ft_hint.render("(in classroom only)", True, (110, 90, 140))
+            panel.blit(lock_s, (bar_x + bar_w - lock_s.get_width() + 10, by))
+
+        pygame.draw.rect(panel, (18, 13, 32), (bar_x, by2, bar_w, bar_h), border_radius=6)
+        fill_w = max(0, int(bar_w * val))
+        if fill_w > 0:
+            if is_locked:
+                fill_col = (70, 55, 100)
+            elif sound_dragging_slider == key:
+                fill_col = (160, 110, 240)
+            else:
+                fill_col = (130, 90, 210)
+            pygame.draw.rect(panel, fill_col, (bar_x, by2, fill_w, bar_h), border_radius=6)
+        pygame.draw.rect(panel, (100, 75, 160), (bar_x, by2, bar_w, bar_h), 1, border_radius=6)
+
+        kx = bar_x + fill_w
+        ky = by2 + bar_h // 2
+        knob_col = (130, 110, 160, 180) if is_locked else (
+            (240, 210, 255, 240) if sound_dragging_slider == key else (210, 185, 255, 220)
+        )
+        pygame.gfxdraw.filled_circle(panel, kx, ky, 9, knob_col)
+        pygame.gfxdraw.aacircle(panel, kx, ky, 9, (160, 130, 220, 255))
+
+        pct_col = (110, 90, 140) if is_locked else (180, 155, 220)
+        pct = font_ft_hint.render(f"{int(val*100)}%", True, pct_col)
+        panel.blit(pct, (bar_x + bar_w + 6, by2 + bar_h // 2 - pct.get_height() // 2))
+
+    # Mute toggle button
+    mut_y = start_y + len(sliders) * row_gap + 4
+    mut_w = PW - 28
+    mut_h = 24
+    mut_hov = pygame.Rect(bar_x, mut_y, mut_w, mut_h).collidepoint(local_mx, local_my)
+    mut_col = (200, 60, 60) if is_muted else ((90, 160, 70) if mut_hov else (55, 120, 45))
+    pygame.draw.rect(panel, (0, 0, 0, 60), (bar_x + 2, mut_y + 3, mut_w, mut_h), border_radius=7)
+    pygame.draw.rect(panel, mut_col, (bar_x, mut_y, mut_w, mut_h), border_radius=7)
+    mut_txt = font_ft_hint.render(
+        "X  MUTED  (click to unmute)" if is_muted else "Mute All",
+        True, WHITE
+    )
+    panel.blit(mut_txt, (PW // 2 - mut_txt.get_width() // 2,
+                          mut_y + mut_h // 2 - mut_txt.get_height() // 2))
+
+    scaled = pygame.transform.smoothscale(panel, (pw_s, ph_s))
+    surf.blit(scaled, (px_s, py_s))
+
+    # return screen-space rects for hit-testing
+    rects = {"panel": pygame.Rect(px_s, py_s, pw_s, ph_s)}
+    for si, (label, val, key) in enumerate(sliders):
+        by2 = start_y + si * row_gap + 16
+        rects[key] = pygame.Rect(
+            px_s + int(bar_x * scale),
+            py_s + int(by2   * scale),
+            int(bar_w         * scale),
+            int((bar_h + 14)  * scale),
+        )
+    rects["mute"] = pygame.Rect(
+        px_s + int(bar_x  * scale),
+        py_s + int(mut_y  * scale),
+        int(mut_w          * scale),
+        int(mut_h          * scale),
+    )
+    return rects
+
+_sound_popup_rects = {}
+
+def toggle_sound_popup():
+    global show_sound_popup, sound_popup_anim
+    show_sound_popup = not show_sound_popup
+    if not show_sound_popup:
+        sound_popup_anim = 0.0
+
+def toggle_mute():
+    global is_muted, vol_music, vol_sfx, vol_ambience, _pre_mute
+    is_muted = not is_muted
+    if is_muted:
+        _pre_mute = (vol_music, vol_sfx, vol_ambience)
+        pygame.mixer.music.set_volume(0)
+        AMBIENCE_CHANNEL.set_volume(0)
+        WARNING_CHANNEL.set_volume(0)
+        TASK_CHANNEL.set_volume(0)
+        CLICK_CHANNEL.set_volume(0)
+    else:
+        vol_music, vol_sfx, vol_ambience = _pre_mute
+        pygame.mixer.music.set_volume(vol_music)
+        AMBIENCE_CHANNEL.set_volume(vol_ambience)
+        WARNING_CHANNEL.set_volume(vol_sfx * 0.5)
+        TASK_CHANNEL.set_volume(vol_music * 0.5)
+        CLICK_CHANNEL.set_volume(vol_sfx)
 
 SCREEN_W = 900
 SCREEN_H = 510
@@ -174,6 +340,8 @@ CL_PROGRESS_B  = ( 60, 160,  40)
 vol_music    = 0.3
 vol_sfx      = 1.0
 vol_ambience = 0.4
+is_muted = False
+_pre_mute = (0.3, 1.0, 0.4)  # stores (music, sfx, ambience) before mute
 
 # ── Load images ───────────────────────────────────────────────────────────────
 def load_bg(filename):
@@ -671,6 +839,7 @@ def draw_mode_select(surf, hov):
     draw_map_button(surf, tuple(BACK_EXIT_RECT),
                     MAP_NAVY, MAP_NAVY_D, MAP_NAVY_H,
                     "BACK / EXIT", "<", hov == "back")
+    draw_mute_button(surf)
 
 # ── Classroom game constants ──────────────────────────────────────────────────
 CLASSROOM_TIME = 120
@@ -2302,6 +2471,7 @@ def draw_classroom(surf, dt):
     elif all(tasks_done):
         _draw_result_banner(surf, win=True, reason="")
 
+    draw_mute_button(surf)
     return icons
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2627,6 +2797,12 @@ def get_popup_close_rect():
     return pygame.Rect(PX + local.x, PY + local.y, local.w, local.h)
 
 BACK_RECT = pygame.Rect(10, 10, 185, 36)
+MUTE_RECT   = pygame.Rect(SCREEN_W - 44, 10, 34, 34)
+show_sound_popup      = False
+sound_popup_anim      = 0.0
+SOUND_POPUP_SPEED     = 0.12
+sound_dragging_slider = None
+_sound_popup_rects    = {}
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ── State machine ─────────────────────────────────────────────────════════════
@@ -2668,6 +2844,10 @@ while running:
     mx, my = pygame.mouse.get_pos()
     dt     = clock.get_time() / 1000.0
 
+    if show_sound_popup:
+        sound_popup_anim = min(1.0, sound_popup_anim + SOUND_POPUP_SPEED)
+    else:
+        sound_popup_anim = max(0.0, sound_popup_anim - SOUND_POPUP_SPEED * 2.5)
     if show_popup and popup_anim < 1.0:
         popup_anim = min(1.0, popup_anim + POPUP_SPEED)
     if show_howto and howto_anim < 1.0:
@@ -2758,6 +2938,7 @@ while running:
 
             if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
                 settings_dragging_slider = None
+                sound_dragging_slider    = None
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 if show_settings:
@@ -2784,6 +2965,19 @@ while running:
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
 
+                if show_sound_popup:
+                    for _key in ("music", "sfx", "ambience"):
+                        _r = _sound_popup_rects.get(_key)
+                        if _r and _r.collidepoint(mx, my):
+                            sound_dragging_slider = _key
+                            break
+                    else:
+                        _mr = _sound_popup_rects.get("mute")
+                        if _mr and _mr.collidepoint(mx, my):
+                            toggle_mute()
+                        elif not _sound_popup_rects.get("panel", pygame.Rect(0,0,0,0)).collidepoint(mx, my):
+                            show_sound_popup = False
+                            sound_popup_anim = 0.0
                 if show_settings:
                     if settings_close_rect.collidepoint(mx, my):
                         play_sound(sfx_click)
@@ -2894,7 +3088,9 @@ while running:
                                 howto_anim = 0.0
 
                 elif state == "classroom":
-                    if teacher_caught_player and not classroom_running:
+                    if MUTE_RECT.collidepoint(mx, my):
+                        toggle_sound_popup()
+                    elif teacher_caught_player and not classroom_running:
                         if caught_try_again_rect.width > 0 and caught_try_again_rect.collidepoint(mx, my):
                             play_sound(sfx_click)
                             teacher_caught_player = False
@@ -2965,7 +3161,9 @@ while running:
                                     break
 
                 elif state == "map":
-                    if CARD_CLASSROOM_RECT.collidepoint(mx, my):
+                    if MUTE_RECT.collidepoint(mx, my):
+                        toggle_sound_popup()
+                    elif CARD_CLASSROOM_RECT.collidepoint(mx, my):
                         play_sound(sfx_click)
                         show_popup = True
                         popup_anim = 0.0
@@ -3075,6 +3273,9 @@ while running:
     elif state == "map":
         hov_map    = None
         cursor_set = False
+        if MUTE_RECT.collidepoint(mx, my):
+            pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+            cursor_set = True
         for rect, rid in [
             (CARD_CLASSROOM_RECT, "classroom"),
             (CARD_LIBRARY_RECT,   "library"),
@@ -3139,6 +3340,13 @@ while running:
     if show_locked:
         draw_locked_popup(screen, locked_anim)
 
+    if show_sound_popup or sound_popup_anim > 0.01:
+        _rects = draw_sound_popup(screen, sound_popup_anim)
+        if _rects:
+            _sound_popup_rects.clear()
+            _sound_popup_rects.update(_rects)
+    else:
+        _sound_popup_rects.clear()
     pygame.display.flip()
     clock.tick(60)
 
