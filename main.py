@@ -499,11 +499,6 @@ def draw_locked_popup(surf, anim_t):
     btn_dark = (40, 100, 30)
     pygame.draw.rect(popup_surf, btn_dark, (okay_x + 2, okay_y + 4, okay_w, okay_h), border_radius=okay_h // 2)
     pygame.draw.rect(popup_surf, btn_col,  (okay_x, okay_y, okay_w, okay_h),          border_radius=okay_h // 2)
-    hl = pygame.Surface((okay_w - 4, okay_h // 2), pygame.SRCALPHA)
-    for hy in range(okay_h // 2):
-        a = int(70 * (1 - hy / (okay_h // 2)))
-        pygame.draw.line(hl, (255, 255, 255, a), (0, hy), (okay_w - 4, hy))
-    popup_surf.blit(hl, (okay_x + 2, okay_y + 2))
     okay_lbl    = font_play.render("Okay!", True, WHITE)
     okay_lbl_sh = font_play.render("Okay!", True, (0, 0, 0))
     okay_lbl_sh.set_alpha(60)
@@ -585,11 +580,6 @@ def draw_modern_button(surf, rect, col_main, col_dark, col_hover, label, icon, h
         surf.blit(shadow_surf, (x - i, y - i + 6))
     draw_smooth_rect(surf, col_dark, (x, y+5, w, h), radius=h//2)
     draw_smooth_rect(surf, col, (x, y, w, h), radius=h//2)
-    highlight = pygame.Surface((w-4, h//2), pygame.SRCALPHA)
-    for hy in range(h//2):
-        alpha = int(80 * (1 - hy / (h//2)))
-        pygame.draw.line(highlight, (255, 255, 255, alpha), (0, hy), (w-4, hy))
-    surf.blit(highlight, (x+2, y+2))
     icon_s   = font_large.render(icon,  True, WHITE)
     label_s  = font_large.render(label, True, WHITE)
     shadow_s = font_large.render(label, True, (0,0,0))
@@ -815,14 +805,14 @@ MAP_BTN_W   = 220
 MAP_BTN_H   = 48
 MAP_BTN_GAP = 100
 MAP_BTN_CX  = SCREEN_W // 2
-MAP_BTN_Y   = SCREEN_H // 2 + 90
+MAP_BTN_Y   = SCREEN_H // 2 + 105
 
 CARD_CLASSROOM_RECT = pygame.Rect(MAP_BTN_CX - MAP_BTN_W - MAP_BTN_GAP // 2, MAP_BTN_Y, MAP_BTN_W, MAP_BTN_H)
 CARD_LIBRARY_RECT   = pygame.Rect(MAP_BTN_CX + MAP_BTN_GAP // 2,              MAP_BTN_Y, MAP_BTN_W, MAP_BTN_H)
 
-BACK_EXIT_W    = 200
+BACK_EXIT_W    = 218
 BACK_EXIT_H    = 50
-BACK_EXIT_RECT = pygame.Rect(SCREEN_W // 2 - BACK_EXIT_W // 2, SCREEN_H - 75, BACK_EXIT_W, BACK_EXIT_H)
+BACK_EXIT_RECT = pygame.Rect(SCREEN_W // 2 - BACK_EXIT_W // 2, SCREEN_H - 65, BACK_EXIT_W, BACK_EXIT_H)
 
 def draw_map_button(surf, rect, col_main, col_dark, col_hover, label, icon, hovered):
     x, y, w, h = rect
@@ -855,13 +845,13 @@ def draw_mode_select(surf, hov):
     surf.blit(bg_map, (0, 0))
     draw_map_button(surf, tuple(CARD_CLASSROOM_RECT),
                     MAP_BLUE, MAP_BLUE_D, MAP_BLUE_H,
-                    "PLAY", ">", hov == "classroom")
+                    "PLAY", "", hov == "classroom")
     draw_map_button(surf, tuple(CARD_LIBRARY_RECT),
                     MAP_RED, MAP_RED_D, MAP_RED_H,
-                    "PLAY", ">", hov == "library")
+                    "PLAY", "", hov == "library")
     draw_map_button(surf, tuple(BACK_EXIT_RECT),
                     MAP_NAVY, MAP_NAVY_D, MAP_NAVY_H,
-                    "BACK / EXIT", "<", hov == "back")
+                    "BACK / EXIT", "", hov == "back")
     draw_mute_button(surf)
 
 # ── Classroom game constants ──────────────────────────────────────────────────
