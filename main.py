@@ -393,7 +393,7 @@ def load_sprite(filename, height):
 TEACHER_H = 180
 teacher_walk_img   = load_sprite("teacher_walk.png",   TEACHER_H)
 teacher_caught_img = load_sprite("teacher_caught.png", TEACHER_H)
-CHECK_ICON_SIZE = 165
+CHECK_ICON_SIZE = 155
 if os.path.exists("check.png"):
     _raw_check = pygame.image.load("check.png").convert_alpha()
     check_img  = pygame.transform.smoothscale(_raw_check, (CHECK_ICON_SIZE, CHECK_ICON_SIZE))
@@ -877,8 +877,8 @@ TEACHER_INTERVAL_MAX  = 11.0
 TEACHER_WALK_SPEED    = 130
 TEACHER_PAUSE_TIME    = 2.5
 TEACHER_WARN_TIME     = 2.5
-TEACHER_PATROL_MIN    = 2.0
-TEACHER_PATROL_MAX    = 3.5
+TEACHER_PATROL_MIN    = 0.5
+TEACHER_PATROL_MAX    = 1.5
 
 teacher_state         = "idle"
 teacher_x             = float(-300)
@@ -3395,6 +3395,1361 @@ while running:
         _sound_popup_rects.clear()
     pygame.display.flip()
     clock.tick(60)
+
+import pygame
+import random
+import math
+from enum import Enum
+from dataclasses import dataclass
+from typing import List, Tuple
+import sys
+import os
+
+
+# Initialize Pygame
+pygame.init()
+ 
+# Screen dimensions
+SCREEN_WIDTH = 900
+SCREEN_HEIGHT = 510
+
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+ORANGE = (255, 140, 0)
+RED = (220, 20, 60)
+GOLD = (255, 215, 0)
+BROWN = (139, 69, 19)
+LIGHT_BROWN = (205, 133, 63)
+GREEN = (34, 139, 34)
+DARK_RED = (139, 0, 0)
+BLUE = (0, 0, 255)
+LIGHT_BLUE = (100, 200, 255)
+
+
+class GameState(Enum):
+    LANDING = 1
+    HOW_TO_PLAY = 2
+    LEVEL_SELECT = 3
+    PLAYING = 4
+    GAME_OVER = 5
+    LEVEL_COMPLETE = 6
+    PAUSED = 7
+    LEVEL_LOCKED = 8
+
+
+@dataclass
+class Button:
+    x: int
+    y: int
+    width: int
+    height: int
+    text: str
+    color: Tuple[int, int, int]
+    action: str
+
+
+class ImageGenerator:
+    """Generate placeholder images since we're using local references"""
+   
+    @staticmethod
+    def load_image(filename: str, width: int, height: int) -> pygame.Surface:
+        """Try to load an image from multiple locations"""
+        possible_paths = [
+            filename,
+            f"assets/{filename}",
+            f"images/{filename}",
+            os.path.expanduser(f"~/{filename}"),
+            os.path.expanduser(f"~/Desktop/{filename}"),
+            os.path.expanduser(f"~/Downloads/{filename}"),
+            os.path.expanduser(f"~/Pictures/{filename}"),
+        ]
+       
+        for path in possible_paths:
+            if os.path.exists(path):
+                try:
+                    image = pygame.image.load(path)
+                    image = pygame.transform.scale(image, (width, height))
+                    print(f"Successfully loaded {filename} from: {path}")
+                    return image
+                except Exception as e:
+                    print(f"Error loading image from {path}: {e}")
+       
+        print(f"Could not find {filename}")
+        return None
+   
+    @staticmethod
+    def create_phoenix_surface(width: int, height: int) -> pygame.Surface:
+        """Load the library scene image as the landing page background"""
+        img = ImageGenerator.load_image("library_landing.png", width, height)
+        if img:
+            return img
+       
+        # Fallback: Create a placeholder surface
+        print("Using generated placeholder for landing page.")
+        surface = pygame.Surface((width, height), pygame.SRCALPHA)
+       
+        # Draw outer circle (gold frame)
+        pygame.draw.circle(surface, GOLD, (width//2, height//2), width//2 - 5, 8)
+       
+        # Draw inner circle (dark background)
+        pygame.draw.circle(surface, DARK_RED, (width//2, height//2), width//2 - 15)
+       
+        # Draw phoenix head (simple)
+        head_x, head_y = width//2, height//3
+        pygame.draw.circle(surface, ORANGE, (head_x, head_y), 30)
+       
+        # Draw beak
+        pygame.draw.polygon(surface, GOLD, [(head_x + 35, head_y),
+                                            (head_x + 50, head_y),
+                                            (head_x + 40, head_y + 5)])
+       
+        # Draw eye
+        pygame.draw.circle(surface, WHITE, (head_x + 15, head_y - 10), 8)
+        pygame.draw.circle(surface, BLACK, (head_x + 15, head_y - 10), 4)
+       
+        # Draw body (flames)
+        pygame.draw.polygon(surface, RED, [(width//2 - 25, height//2),
+                                           (width//2 + 25, height//2),
+                                           (width//2 + 20, height//2 + 40),
+                                           (width//2 - 20, height//2 + 40)])
+       
+        # Draw tail flames
+        pygame.draw.polygon(surface, ORANGE, [(width//2 + 30, height//2),
+                                              (width//2 + 60, height//2 + 20),
+                                              (width//2 + 50, height//2 + 50),
+                                              (width//2 + 25, height//2 + 40)])
+       
+        return surface
+   
+    @staticmethod
+    def load_level_select_background(width: int, height: int) -> pygame.Surface:
+        """Load the level select background image"""
+        img = ImageGenerator.load_image("library_level.png", width, height)
+        if img:
+            return img
+       
+        # Fallback: Create a placeholder surface
+        print("Using generated placeholder for level select.")
+        surface = pygame.Surface((width, height))
+        surface.fill((220, 210, 180))
+        return surface
+   
+    @staticmethod
+    def load_level1_background(width: int, height: int) -> pygame.Surface:
+        """Load the level 1 background image"""
+        img = ImageGenerator.load_image("level1_bg.png", width, height)
+        if img:
+            return img
+       
+        # Fallback: Create a placeholder surface
+        print("Using generated placeholder for level 1 background.")
+        surface = pygame.Surface((width, height))
+        surface.fill((220, 210, 180))
+        return surface
+   
+    @staticmethod
+    def load_level4_background(width: int, height: int) -> pygame.Surface:
+        """Load the level 4 background image"""
+        img = ImageGenerator.load_image("level4_bg.png", width, height)
+        if img:
+            return img
+       
+        # Fallback: Create a placeholder surface
+        print("Using generated placeholder for level 4 background.")
+        surface = pygame.Surface((width, height))
+        surface.fill((180, 160, 140))
+        return surface
+   
+    @staticmethod
+    def load_howto_background(width: int, height: int) -> pygame.Surface:
+        """Load the how to play background image"""
+        img = ImageGenerator.load_image("lib_howto.png", width, height)
+        if img:
+            return img
+       
+        # Fallback: Create a placeholder surface
+        print("Using generated placeholder for how to play.")
+        surface = pygame.Surface((width, height))
+        surface.fill((240, 220, 200))
+       
+        # Add placeholder text
+        font = pygame.font.Font(None, 40)
+        text = font.render("HOW TO PLAY", True, BROWN)
+        surface.blit(text, (width//2 - text.get_width()//2, height//2 - text.get_height()//2))
+       
+        return surface
+   
+    @staticmethod
+    def load_level_completed_background(width: int, height: int) -> pygame.Surface:
+        """Load the level completed background image"""
+        img = ImageGenerator.load_image("level_completed_lib.png", width, height)
+        if img:
+            return img
+       
+        # Fallback: Create a placeholder surface
+        print("Using generated placeholder for level completed.")
+        surface = pygame.Surface((width, height))
+        surface.fill((220, 210, 180))
+        return surface
+   
+    @staticmethod
+    def load_caught_background(width: int, height: int) -> pygame.Surface:
+        """Load the caught/game over background image"""
+        img = ImageGenerator.load_image("caught_lib.png", width, height)
+        if img:
+            return img
+       
+        # Fallback: Create a placeholder surface
+        print("Using generated placeholder for caught screen.")
+        surface = pygame.Surface((width, height))
+        surface.fill((220, 210, 180))
+        return surface
+   
+    @staticmethod
+    def load_feather_image(size: int = 40) -> pygame.Surface:
+        """Load the feather image"""
+        img = ImageGenerator.load_image("feather.png", size, size)
+        if img:
+            return img
+       
+        # Fallback: Create a placeholder feather surface
+        print("Using generated placeholder for feather.")
+        surface = pygame.Surface((size, size), pygame.SRCALPHA)
+        pygame.draw.polygon(surface, GOLD, [(size//2, 5), (size - 5, size - 5),
+                                           (size//2 + 3, size//2)])
+        pygame.draw.line(surface, ORANGE, (size//2, 5), (size//2, size - 5), 2)
+        return surface
+   
+    @staticmethod
+    def create_librarian_surface(width: int, height: int) -> pygame.Surface:
+        """Create a librarian character"""
+        surface = pygame.Surface((width, height), pygame.SRCALPHA)
+       
+        # Draw body (tan)
+        pygame.draw.polygon(surface, LIGHT_BROWN, [(width//2 - 20, height//4),
+                                                   (width//2 + 20, height//4),
+                                                   (width//2 + 25, height - 20),
+                                                   (width//2 - 25, height - 20)])
+       
+        # Draw head
+        pygame.draw.circle(surface, (210, 180, 140), (width//2, height//5), 20)
+       
+        # Draw hair
+        pygame.draw.polygon(surface, (120, 80, 60), [(width//2 - 22, height//5 - 5),
+                                                     (width//2 + 22, height//5 - 5),
+                                                     (width//2 + 20, height//5 + 25),
+                                                     (width//2 - 20, height//5 + 25)])
+       
+        # Draw eyes
+        pygame.draw.circle(surface, BLACK, (width//2 - 8, height//5 - 5), 3)
+        pygame.draw.circle(surface, BLACK, (width//2 + 8, height//5 - 5), 3)
+       
+        # Draw glasses
+        pygame.draw.rect(surface, BLACK, (width//2 - 15, height//5 - 8, 7, 6), 1)
+        pygame.draw.rect(surface, BLACK, (width//2 + 8, height//5 - 8, 7, 6), 1)
+       
+        # Draw arms
+        pygame.draw.line(surface, LIGHT_BROWN, (width//2 - 20, height//4 + 10),
+                        (width//2 - 40, height//3), 5)
+        pygame.draw.line(surface, LIGHT_BROWN, (width//2 + 20, height//4 + 10),
+                        (width//2 + 40, height//3), 5)
+       
+        return surface
+   
+    @staticmethod
+    def create_spark_surface(size: int) -> pygame.Surface:
+        """Create a magical spark"""
+        surface = pygame.Surface((size, size), pygame.SRCALPHA)
+        pygame.draw.polygon(surface, GOLD, [(size//2, 0), (size, size//2),
+                                           (size//2, size), (0, size//2)])
+        pygame.draw.circle(surface, ORANGE, (size//2, size//2), size//4)
+        return surface
+
+
+class LibraryGame:
+    def __init__(self):
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.display.set_caption("Phoenix Library Games")
+        self.clock = pygame.time.Clock()
+        self.font_large = pygame.font.Font(None, 60)
+        self.font_medium = pygame.font.Font(None, 40)
+        self.font_small = pygame.font.Font(None, 28)
+        self.font_tiny = pygame.font.Font(None, 20)
+       
+        self.state = GameState.LANDING
+        self.current_level = 0
+        self.running = True
+        self.previous_state = None
+        self.levels_completed = set()
+        self.locked_message_timer = 0
+       
+        # Generate images
+        self.phoenix_img = ImageGenerator.create_phoenix_surface(900, 510)
+        self.level_select_bg = ImageGenerator.load_level_select_background(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.level1_bg = ImageGenerator.load_level1_background(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.level4_bg = ImageGenerator.load_level4_background(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.howto_bg = ImageGenerator.load_howto_background(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.level_completed_bg = ImageGenerator.load_level_completed_background(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.caught_bg = ImageGenerator.load_caught_background(SCREEN_WIDTH, SCREEN_HEIGHT)
+        self.librarian_img = ImageGenerator.create_librarian_surface(80, 120)
+        self.feather_img = ImageGenerator.load_feather_image(40)
+        self.spark_img = ImageGenerator.create_spark_surface(20)
+       
+        # Level instances
+        self.current_game = None
+       
+        # Level button positions
+        self.level_buttons = [
+            {'x': 80, 'y': 70, 'width': 200, 'height': 160, 'level': 1},
+            {'x': 350, 'y': 70, 'width': 200, 'height': 160, 'level': 2},
+            {'x': 620, 'y': 70, 'width': 200, 'height': 160, 'level': 3},
+            {'x': 215, 'y': 280, 'width': 200, 'height': 160, 'level': 4},
+            {'x': 485, 'y': 280, 'width': 200, 'height': 160, 'level': 5},
+        ]
+       
+        # Button hitbox areas - LANDING PAGE
+        self.question_button = pygame.Rect(250, 35, 80, 70)
+       
+        # Button hitbox areas - HOW TO PLAY PAGE
+        self.howto_back_button = pygame.Rect(20, 25, 90, 70)
+        self.howto_x_button = pygame.Rect(820, 20, 70, 70)
+       
+        # Button hitbox areas - LEVEL SELECT PAGE
+        self.level_select_back_button = pygame.Rect(20, 15, 90, 50)
+        self.level_select_settings_button = pygame.Rect(820, 15, 70, 50)
+       
+        # Button hitbox areas - LEVEL 1 GAMEPLAY PAGE
+        self.level1_back_button = pygame.Rect(20, 20, 70, 50)
+        self.level1_settings_button = pygame.Rect(820, 20, 70, 50)
+       
+        # Button hitbox areas - LEVEL COMPLETE PAGE
+        # Invisible buttons positioned to match the visible buttons in the reference image
+        self.level_complete_next_button = pygame.Rect(550, 290, 250, 60)
+        self.level_complete_back_button = pygame.Rect(550, 370, 250, 60)
+       
+        # Button hitbox areas - GAME OVER PAGE (caught)
+        # Based on the caught_lib.png reference image
+        # Retry button (top red button) - centered horizontally, positioned at button location
+        self.gameover_retry_button = pygame.Rect(350, 360, 200, 50)
+        # Back to Level Selection button (bottom blue button) - centered horizontally, positioned at button location
+        self.gameover_back_button = pygame.Rect(350, 425, 200, 50)
+   
+    def handle_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+           
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = pygame.mouse.get_pos()
+                print(f"Click at: {mouse_pos}")
+               
+                if self.state == GameState.LANDING:
+                    self.handle_landing_click(mouse_pos)
+                elif self.state == GameState.HOW_TO_PLAY:
+                    self.handle_howto_click(mouse_pos)
+                elif self.state == GameState.LEVEL_SELECT:
+                    self.handle_level_select_click(mouse_pos)
+                elif self.state == GameState.PLAYING:
+                    self.handle_playing_click(mouse_pos)
+                elif self.state == GameState.PAUSED:
+                    self.handle_pause_click(mouse_pos)
+                elif self.state == GameState.GAME_OVER:
+                    self.handle_gameover_click(mouse_pos)
+                elif self.state == GameState.LEVEL_COMPLETE:
+                    self.handle_complete_click(mouse_pos)
+                elif self.state == GameState.LEVEL_LOCKED:
+                    self.handle_locked_click(mouse_pos)
+           
+            if self.state == GameState.PLAYING:
+                self.current_game.handle_event(event)
+   
+    def handle_playing_click(self, pos):
+        """Handle clicks during gameplay"""
+        # Check pause button (top-right)
+        if 820 < pos[0] < 890 and 20 < pos[1] < 70:
+            self.state = GameState.PAUSED
+            self.current_game.pause_game()
+            return
+       
+        # Check back button (top-left)
+        if 20 < pos[0] < 90 and 20 < pos[1] < 70:
+            self.state = GameState.LEVEL_SELECT
+            return
+       
+        # Pass click to game
+        self.current_game.handle_click(pos)
+   
+    def handle_pause_click(self, pos):
+        """Handle clicks on pause screen"""
+        # Resume button
+        if 300 < pos[0] < 600 and 320 < pos[1] < 380:
+            self.state = GameState.PLAYING
+            self.current_game.resume_game()
+        # Back to menu
+        elif 300 < pos[0] < 600 and 400 < pos[1] < 460:
+            self.state = GameState.LEVEL_SELECT
+   
+    def handle_landing_click(self, pos):
+        """Handle clicks on landing page"""
+        print(f"Landing page click at: {pos}")
+        print(f"Question button rect: {self.question_button}")
+       
+        # Check question mark (?) button first
+        if self.question_button.collidepoint(pos):
+            print("Question button clicked!")
+            self.previous_state = GameState.LANDING
+            self.state = GameState.HOW_TO_PLAY
+            return
+       
+        # Play Now button position - centered at bottom
+        if 340 < pos[0] < 560 and 430 < pos[1] < 490:
+            print("Play Now button clicked!")
+            self.state = GameState.LEVEL_SELECT
+            return
+   
+    def handle_howto_click(self, pos):
+        """Handle clicks on how to play page"""
+        print(f"How to play click at: {pos}")
+        print(f"Back button rect: {self.howto_back_button}")
+        print(f"X button rect: {self.howto_x_button}")
+       
+        # Back button - top left to go back
+        if self.howto_back_button.collidepoint(pos):
+            print("Back button clicked!")
+            self.state = self.previous_state if self.previous_state else GameState.LANDING
+            self.previous_state = None
+            return
+       
+        # X button - top right to go back
+        if self.howto_x_button.collidepoint(pos):
+            print("X button clicked!")
+            self.state = self.previous_state if self.previous_state else GameState.LANDING
+            self.previous_state = None
+            return
+   
+    def handle_level_select_click(self, pos):
+        """Handle clicks on level select"""
+        print(f"Level select click at: {pos}")
+       
+        # Back button
+        if self.level_select_back_button.collidepoint(pos):
+            print("Back button clicked on level select!")
+            self.state = GameState.LANDING
+            return
+       
+        # Settings button (ignore for now)
+        if self.level_select_settings_button.collidepoint(pos):
+            print("Settings button clicked!")
+            return
+       
+        # Check level buttons
+        for button in self.level_buttons:
+            if (button['x'] < pos[0] < button['x'] + button['width'] and
+                button['y'] < pos[1] < button['y'] + button['height']):
+                level = button['level']
+                print(f"Clicked level {level}")
+               
+                # Check if level is available
+                if level == 1:
+                    self.current_level = level
+                    self.start_level(level)
+                elif level - 1 in self.levels_completed:
+                    self.current_level = level
+                    self.start_level(level)
+                else:
+                    print(f"Level {level} is locked!")
+                    self.state = GameState.LEVEL_LOCKED
+                    self.locked_level = level
+                    self.locked_message_timer = 300
+                return
+   
+    def handle_locked_click(self, pos):
+        """Handle clicks on locked level message"""
+        self.state = GameState.LEVEL_SELECT
+        self.locked_message_timer = 0
+   
+    def handle_gameover_click(self, pos):
+        """Handle game over screen clicks with invisible buttons"""
+        print(f"Game over click at: {pos}")
+        print(f"Retry button rect: {self.gameover_retry_button}")
+        print(f"Back button rect: {self.gameover_back_button}")
+       
+        # Retry button (top red button)
+        if self.gameover_retry_button.collidepoint(pos):
+            print("Retry button clicked!")
+            self.start_level(self.current_level)
+        # Back to Level Selection button (bottom blue button)
+        elif self.gameover_back_button.collidepoint(pos):
+            print("Back to Level Selection button clicked!")
+            self.state = GameState.LEVEL_SELECT
+   
+    def handle_complete_click(self, pos):
+        """Handle level complete clicks"""
+        print(f"Level complete click at: {pos}")
+        print(f"Next button rect: {self.level_complete_next_button}")
+        print(f"Back button rect: {self.level_complete_back_button}")
+       
+        # Next Level button
+        if self.level_complete_next_button.collidepoint(pos):
+            print("Next Level button clicked!")
+            self.levels_completed.add(self.current_level)
+           
+            if self.current_level < 5:
+                self.current_level += 1
+                self.start_level(self.current_level)
+            else:
+                self.state = GameState.LEVEL_SELECT
+        # Back to Level Selection button
+        elif self.level_complete_back_button.collidepoint(pos):
+            print("Back to Level Selection button clicked!")
+            self.levels_completed.add(self.current_level)
+            self.state = GameState.LEVEL_SELECT
+   
+    def start_level(self, level: int):
+        """Start a specific level"""
+        self.state = GameState.PLAYING
+       
+        if level == 1:
+            self.current_game = Level1_CollectFeathers(self)
+        elif level == 2:
+            self.current_game = Level2_CoolDown(self)
+        elif level == 3:
+            self.current_game = Level3_SparkCatching(self)
+        elif level == 4:
+            self.current_game = Level4_HideBurns(self)
+        elif level == 5:
+            self.current_game = Level5_FireHiccups(self)
+   
+    def draw_landing_page(self):
+        """Draw the library landing page with background image"""
+        self.screen.blit(self.phoenix_img, (0, 0))
+   
+    def draw_howto_page(self):
+        """Draw the how to play page"""
+        self.screen.blit(self.howto_bg, (0, 0))
+   
+    def draw_level_select(self):
+        """Draw level select screen with background image"""
+        self.screen.blit(self.level_select_bg, (0, 0))
+   
+    def draw_level_locked(self):
+        """Draw level locked message"""
+        self.screen.blit(self.level_select_bg, (0, 0))
+       
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(200)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+       
+        title = self.font_large.render("LEVEL LOCKED", True, RED)
+        self.screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
+       
+        msg = self.font_medium.render("Complete the previous level first!", True, GOLD)
+        self.screen.blit(msg, (SCREEN_WIDTH//2 - msg.get_width()//2, 250))
+       
+        hint = self.font_small.render("Click anywhere to return", True, WHITE)
+        self.screen.blit(hint, (SCREEN_WIDTH//2 - hint.get_width()//2, 350))
+   
+    def draw_pause_screen(self):
+        """Draw pause overlay"""
+        overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        overlay.set_alpha(200)
+        overlay.fill(BLACK)
+        self.screen.blit(overlay, (0, 0))
+       
+        title = self.font_large.render("PAUSED", True, GOLD)
+        self.screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 100))
+       
+        resume_rect = pygame.Rect(300, 320, 300, 60)
+        pygame.draw.rect(self.screen, GREEN, resume_rect, border_radius=8)
+        pygame.draw.rect(self.screen, DARK_RED, resume_rect, 3, border_radius=8)
+       
+        resume_text = self.font_medium.render("RESUME", True, WHITE)
+        self.screen.blit(resume_text, (resume_rect.centerx - resume_text.get_width()//2,
+                                       resume_rect.centery - resume_text.get_height()//2))
+       
+        back_rect = pygame.Rect(300, 400, 300, 60)
+        pygame.draw.rect(self.screen, ORANGE, back_rect, border_radius=8)
+        pygame.draw.rect(self.screen, BROWN, back_rect, 3, border_radius=8)
+       
+        back_text = self.font_medium.render("BACK TO MENU", True, WHITE)
+        self.screen.blit(back_text, (back_rect.centerx - back_text.get_width()//2,
+                                     back_rect.centery - back_text.get_height()//2))
+   
+    def draw_game_over(self):
+        """Draw game over screen with caught_lib.png background and invisible buttons"""
+        # Draw the caught background image only
+        self.screen.blit(self.caught_bg, (0, 0))
+       
+        # Buttons are invisible but still functional (hitbox areas only)
+        # No visual buttons drawn, just the background from the image
+   
+    def draw_level_complete(self):
+        """Draw level complete screen with background image and invisible buttons"""
+        # Draw the level completed background image only
+        self.screen.blit(self.level_completed_bg, (0, 0))
+       
+        # Buttons are invisible but still functional (hitbox areas only)
+        # No visual buttons drawn, just the background from the image
+   
+    def draw_game_controls(self):
+        """Draw pause and back buttons"""
+        back_rect = pygame.Rect(20, 20, 60, 40)
+        pygame.draw.rect(self.screen, ORANGE, back_rect, border_radius=5)
+        pygame.draw.rect(self.screen, BROWN, back_rect, 2, border_radius=5)
+        back_text = self.font_tiny.render("BACK", True, WHITE)
+        self.screen.blit(back_text, (back_rect.centerx - back_text.get_width()//2,
+                                     back_rect.centery - back_text.get_height()//2))
+       
+        pause_rect = pygame.Rect(820, 20, 60, 40)
+        pygame.draw.rect(self.screen, GREEN, pause_rect, border_radius=5)
+        pygame.draw.rect(self.screen, DARK_RED, pause_rect, 2, border_radius=5)
+        pause_text = self.font_tiny.render("PAUSE", True, WHITE)
+        self.screen.blit(pause_text, (pause_rect.centerx - pause_text.get_width()//2,
+                                      pause_rect.centery - pause_text.get_height()//2))
+   
+    def update(self):
+        if self.state == GameState.PLAYING:
+            if self.current_game.update():
+                if self.current_game.won:
+                    self.state = GameState.LEVEL_COMPLETE
+                else:
+                    self.state = GameState.GAME_OVER
+        elif self.state == GameState.LEVEL_LOCKED:
+            self.locked_message_timer -= 1
+            if self.locked_message_timer <= 0:
+                self.state = GameState.LEVEL_SELECT
+   
+    def draw(self):
+        if self.state == GameState.LANDING:
+            self.draw_landing_page()
+        elif self.state == GameState.HOW_TO_PLAY:
+            self.draw_howto_page()
+        elif self.state == GameState.LEVEL_SELECT:
+            self.draw_level_select()
+        elif self.state == GameState.LEVEL_LOCKED:
+            self.draw_level_locked()
+        elif self.state == GameState.PLAYING:
+            self.current_game.draw(self.screen)
+            self.draw_game_controls()
+        elif self.state == GameState.PAUSED:
+            self.current_game.draw(self.screen)
+            self.draw_pause_screen()
+        elif self.state == GameState.GAME_OVER:
+            self.draw_game_over()
+        elif self.state == GameState.LEVEL_COMPLETE:
+            self.draw_level_complete()
+       
+        pygame.display.flip()
+   
+    def run(self):
+        while self.running:
+            self.handle_events()
+            self.update()
+            self.draw()
+            self.clock.tick(60)
+       
+        pygame.quit()
+        sys.exit()
+
+
+# ============ LEVEL IMPLEMENTATIONS ============
+
+
+class Level1_CollectFeathers:
+    """Level 1: Collect 20 hidden feathers in 25 seconds"""
+    def __init__(self, game: LibraryGame):
+        self.game = game
+        self.time_limit = 25  # 25 SECONDS
+        self.time_remaining = self.time_limit
+        self.feathers_collected = 0
+        self.feathers_needed = 20
+        self.won = False
+        self.feather_positions = []
+        self.paused = False
+        self.pause_time = 0
+        self.generate_feathers()
+        self.start_time = pygame.time.get_ticks()
+        print(f"Level 1 started: Time limit = {self.time_limit} seconds")
+        print(f"Generated {len(self.feather_positions)} feathers")
+   
+    def generate_feathers(self):
+        """Generate exactly 20 feather positions spread apart in the library background"""
+        # Define playable area (avoiding buttons and title area)
+        min_x = 100
+        max_x = SCREEN_WIDTH - 100
+        min_y = 100
+        max_y = SCREEN_HEIGHT - 80
+       
+        positions = []
+       
+        # Create a 5x4 grid layout to ensure we can fit 20 feathers with proper spacing
+        grid_cols = 5
+        grid_rows = 4
+        cell_width = (max_x - min_x) // grid_cols
+        cell_height = (max_y - min_y) // grid_rows
+       
+        for row in range(grid_rows):
+            for col in range(grid_cols):
+                # Add randomness within each grid cell
+                x = min_x + col * cell_width + random.randint(10, max(11, cell_width - 10))
+                y = min_y + row * cell_height + random.randint(10, max(11, cell_height - 10))
+                positions.append({'x': x, 'y': y, 'collected': False})
+       
+        # Shuffle positions for visual variety
+        random.shuffle(positions)
+       
+        # Take exactly 20 feathers
+        self.feather_positions = positions[:20]
+       
+        # Ensure we have exactly 20
+        assert len(self.feather_positions) == 20, f"Expected 20 feathers, got {len(self.feather_positions)}"
+   
+    def pause_game(self):
+        """Pause the game and freeze timer"""
+        self.paused = True
+        self.pause_time = pygame.time.get_ticks()
+   
+    def resume_game(self):
+        """Resume the game and adjust start time"""
+        if self.paused:
+            pause_duration = pygame.time.get_ticks() - self.pause_time
+            self.start_time += pause_duration
+            self.paused = False
+   
+    def handle_click(self, pos):
+        """Check if click is on a feather"""
+        for feather in self.feather_positions:
+            if not feather['collected']:
+                dist = math.sqrt((pos[0] - feather['x'])**2 + (pos[1] - feather['y'])**2)
+                if dist < 35:
+                    feather['collected'] = True
+                    self.feathers_collected += 1
+                    print(f"Feather collected! {self.feathers_collected}/{self.feathers_needed}")
+                    break
+   
+    def handle_event(self, event):
+        pass
+   
+    def update(self) -> bool:
+        """Update game state, return True if level ended"""
+        if not self.paused:
+            elapsed = (pygame.time.get_ticks() - self.start_time) // 1000
+            self.time_remaining = max(0, self.time_limit - elapsed)
+       
+        if self.feathers_collected >= self.feathers_needed:
+            self.won = True
+            return True
+       
+        if self.time_remaining <= 0:
+            self.won = False
+            return True
+       
+        return False
+   
+    def draw(self, screen):
+        # Draw background image
+        screen.blit(self.game.level1_bg, (0, 0))
+       
+        # Draw feathers
+        for feather in self.feather_positions:
+            if not feather['collected']:
+                # Draw feather image at the position
+                screen.blit(self.game.feather_img,
+                           (feather['x'] - 20, feather['y'] - 20))
+       
+        # HUD - Feathers collected
+        hud_text = self.game.font_small.render(
+            f"Collected: {self.feathers_collected}/{self.feathers_needed}", True, BROWN)
+        screen.blit(hud_text, (30, 75))
+       
+        # HUD - Time remaining
+        time_color = RED if self.time_remaining < 10 else BROWN
+        time_text = self.game.font_small.render(
+            f"Time: {self.time_remaining}s", True, time_color)
+        screen.blit(time_text, (SCREEN_WIDTH - 250, 75))
+
+
+class Level2_CoolDown:
+    """Level 2: Click correct cooling objects, avoid wrong ones"""
+    def __init__(self, game: LibraryGame):
+        self.game = game
+        self.correct_clicks = 0
+        self.correct_needed = 10
+        self.wrong_clicks = 0
+        self.max_wrong = 3
+        self.won = False
+        self.objects = []
+        self.paused = False
+        self.generate_objects()
+        self.start_time = pygame.time.get_ticks()
+   
+    def generate_objects(self):
+        """Generate cooling objects (correct) and hot objects (wrong)"""
+        cooling_objects = ['ice', 'water', 'snowflake', 'fan', 'freezer']
+        hot_objects = ['fire', 'lava', 'sun', 'torch', 'coal']
+       
+        used_positions = set()
+       
+        for i in range(self.correct_needed):
+            while True:
+                x = random.randint(120, SCREEN_WIDTH - 120)
+                y = random.randint(120, SCREEN_HEIGHT - 120)
+                pos = (x // 80, y // 80)
+                if pos not in used_positions:
+                    used_positions.add(pos)
+                    break
+           
+            self.objects.append({
+                'x': x, 'y': y, 'type': random.choice(cooling_objects),
+                'correct': True, 'clicked': False
+            })
+       
+        for i in range(self.max_wrong + 5):
+            while True:
+                x = random.randint(120, SCREEN_WIDTH - 120)
+                y = random.randint(120, SCREEN_HEIGHT - 120)
+                pos = (x // 80, y // 80)
+                if pos not in used_positions:
+                    used_positions.add(pos)
+                    break
+           
+            self.objects.append({
+                'x': x, 'y': y, 'type': random.choice(hot_objects),
+                'correct': False, 'clicked': False
+            })
+   
+    def pause_game(self):
+        """Pause the game"""
+        self.paused = True
+   
+    def resume_game(self):
+        """Resume the game"""
+        self.paused = False
+   
+    def handle_click(self, pos):
+        """Handle object clicks"""
+        for obj in self.objects:
+            if not obj['clicked']:
+                dist = math.sqrt((pos[0] - obj['x'])**2 + (pos[1] - obj['y'])**2)
+                if dist < 28:
+                    obj['clicked'] = True
+                    if obj['correct']:
+                        self.correct_clicks += 1
+                    else:
+                        self.wrong_clicks += 1
+                    break
+   
+    def handle_event(self, event):
+        pass
+   
+    def update(self) -> bool:
+        if self.correct_clicks >= self.correct_needed:
+            self.won = True
+            return True
+       
+        if self.wrong_clicks >= self.max_wrong:
+            self.won = False
+            return True
+       
+        return False
+   
+    def draw(self, screen):
+        screen.fill((200, 220, 255))
+       
+        title = self.game.font_large.render("Cool Down the Phoenix!", True, BLUE)
+        screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 15))
+       
+        for obj in self.objects:
+            if not obj['clicked']:
+                color = LIGHT_BLUE if obj['correct'] else RED
+                pygame.draw.circle(screen, color, (obj['x'], obj['y']), 25)
+                text = self.game.font_tiny.render(obj['type'], True, WHITE)
+                screen.blit(text, (obj['x'] - text.get_width()//2,
+                                  obj['y'] - text.get_height()//2))
+       
+        correct_text = self.game.font_small.render(
+            f"Correct: {self.correct_clicks}/{self.correct_needed}", True, GREEN)
+        screen.blit(correct_text, (30, 75))
+       
+        wrong_text = self.game.font_small.render(
+            f"Wrong: {self.wrong_clicks}/{self.max_wrong}", True, RED)
+        screen.blit(wrong_text, (SCREEN_WIDTH - 250, 75))
+
+
+class Level3_SparkCatching:
+    """Level 3: Catch magical sparks in jar"""
+    def __init__(self, game: LibraryGame):
+        self.game = game
+        self.sparks = []
+        self.caught_sparks = 0
+        self.sparks_needed =30
+        self.missed_sparks = 0
+        self.max_misses = 3
+        self.won = False
+        self.jar_x = SCREEN_WIDTH // 2
+        self.jar_y = SCREEN_HEIGHT - 80
+        self.jar_size = 40
+        self.spawn_counter = 0
+        self.paused = False
+        self.pause_time = 0
+        self.start_time = pygame.time.get_ticks()
+        # Margin constraints: 0.5 inches from left and right edges
+        # Assuming ~96 DPI standard, 0.5 inches = 48 pixels
+        self.left_margin = 48
+        self.right_margin = SCREEN_WIDTH - 48
+   
+    def spawn_spark(self):
+        """Spawn a new spark"""
+        x = random.randint(self.left_margin, self.right_margin)
+        y = random.randint(80, 180)
+        vx = random.uniform(-1.2, 1.2)
+        vy = random.uniform(1.0, 1.8)
+       
+        self.sparks.append({
+            'x': x, 'y': y, 'vx': vx, 'vy': vy, 'size': 12
+        })
+   
+    def pause_game(self):
+        """Pause the game"""
+        self.paused = True
+        self.pause_time = pygame.time.get_ticks()
+   
+    def resume_game(self):
+        """Resume the game"""
+        self.paused = False
+   
+    def handle_click(self, pos):
+        """Check if spark is caught"""
+        for spark in self.sparks[:]:
+            dist = math.sqrt((pos[0] - spark['x'])**2 + (pos[1] - spark['y'])**2)
+            if dist < spark['size'] + 15:
+                self.caught_sparks += 1
+                self.sparks.remove(spark)
+                break
+   
+    def handle_event(self, event):
+        """Handle mouse motion for jar positioning"""
+        if event.type == pygame.MOUSEMOTION:
+            self.jar_x = max(40, min(SCREEN_WIDTH - 40, event.pos[0]))
+   
+    def update(self) -> bool:
+        if not self.paused:
+            self.spawn_counter += 1
+            if self.spawn_counter > 40:
+                self.spawn_spark()
+                self.spawn_counter = 0
+           
+            for spark in self.sparks[:]:
+                spark['x'] += spark['vx']
+                spark['y'] += spark['vy']
+               
+                # Check if spark passes left or right margin - bounce it back
+                if spark['x'] < self.left_margin:
+                    spark['x'] = self.left_margin
+                    spark['vx'] = abs(spark['vx'])  # Reverse direction (make positive)
+                elif spark['x'] > self.right_margin:
+                    spark['x'] = self.right_margin
+                    spark['vx'] = -abs(spark['vx'])  # Reverse direction (make negative)
+               
+                # Check if spark is caught by jar
+                dist = math.sqrt((spark['x'] - self.jar_x)**2 +
+                                (spark['y'] - self.jar_y)**2)
+                if dist < self.jar_size + spark['size']:
+                    self.caught_sparks += 1
+                    self.sparks.remove(spark)
+                # Check if spark passes bottom (missed)
+                elif spark['y'] > SCREEN_HEIGHT:
+                    self.missed_sparks += 1
+                    self.sparks.remove(spark)
+       
+        if self.caught_sparks >= self.sparks_needed:
+            self.won = True
+            return True
+       
+        if self.missed_sparks >= self.max_misses:
+            self.won = False
+            return True
+       
+        return False
+   
+    def draw(self, screen):
+        screen.fill((255, 200, 100))
+       
+        title = self.game.font_large.render("Catch the Sparks!", True, BROWN)
+        screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 15))
+       
+        for spark in self.sparks:
+            pygame.draw.circle(screen, GOLD, (int(spark['x']), int(spark['y'])),
+                             spark['size'])
+            pygame.draw.circle(screen, ORANGE, (int(spark['x']), int(spark['y'])),
+                             spark['size'] - 2, 1)
+       
+        pygame.draw.polygon(screen, (150, 150, 200),
+                           [(self.jar_x - self.jar_size, self.jar_y),
+                            (self.jar_x + self.jar_size, self.jar_y),
+                            (self.jar_x + self.jar_size - 8, self.jar_y + self.jar_size),
+                            (self.jar_x - self.jar_size + 8, self.jar_y + self.jar_size)])
+       
+        pygame.draw.line(screen, BLACK, (self.jar_x - self.jar_size - 4, self.jar_y),
+                        (self.jar_x + self.jar_size + 4, self.jar_y), 3)
+       
+        caught_text = self.game.font_small.render(
+            f"Caught: {self.caught_sparks}/{self.sparks_needed}", True, GREEN)
+        screen.blit(caught_text, (30, 75))
+       
+        missed_text = self.game.font_small.render(
+            f"Missed: {self.missed_sparks}/{self.max_misses}", True, RED)
+        screen.blit(missed_text, (SCREEN_WIDTH - 250, 75))
+
+
+class Level4_HideBurns:
+    """Level 4: Match card pairs (7 pairs = 14 cards total) - 1 minute 30 seconds time limit"""
+    def __init__(self, game: LibraryGame):
+        self.game = game
+        self.cards = []
+        self.matched_pairs = 0
+        self.total_pairs = 7
+        self.won = False
+        self.first_card = None
+        self.second_card = None
+        self.can_click = True
+        self.paused = False
+        self.pause_time = 0
+        self.flip_timer = 0
+        self.time_limit = 90  # 1 MINUTE 30 SECONDS
+        self.time_remaining = self.time_limit
+        self.generate_cards()
+        self.start_time = pygame.time.get_ticks()
+        self.card_width = 80
+        self.card_height = 120
+        self.back_card_image = ImageGenerator.load_image("back_card.jpg", self.card_width, self.card_height)
+       
+        print(f"Level 4 started: {len(self.cards)} cards, {self.total_pairs} pairs, {self.time_limit} seconds")
+   
+    def generate_cards(self):
+        """Generate 7 matching card pairs (7 pairs * 2 cards each = 14 cards)"""
+        # Create pairs using image files
+        pairs = [
+            ('1a.jpg', '1b.jpeg'),
+            ('2a.jpg', '2b.jpg'),
+            ('3a.jpg', '3b.jpg'),
+            ('4a.jpg', '4b.jpg'),
+            ('5a.jpg', '5b.jpg'),
+            ('6a.jpg', '6b.jpg'),
+            ('7a.jpg', '7b.jpg'),
+        ]
+       
+        # Create card list with all pairs
+        card_list = []
+        for idx, (file_a, file_b) in enumerate(pairs):
+            card_list.append({
+                'pair_id': idx + 1,
+                'image_file': file_a,
+                'card_id': idx * 2
+            })
+            card_list.append({
+                'pair_id': idx + 1,
+                'image_file': file_b,
+                'card_id': idx * 2 + 1
+            })
+       
+        # Shuffle the cards
+        random.shuffle(card_list)
+       
+        # Calculate grid layout (7 columns x 2 rows for 14 cards)
+        cols = 7
+        rows = 2
+        card_width = 80
+        card_height = 120
+        start_x = (SCREEN_WIDTH - (cols * card_width + (cols - 1) * 10)) // 2
+        start_y = (SCREEN_HEIGHT - (rows * card_height + (rows - 1) * 10)) // 2 + 40
+       
+        # Position cards
+        card_index = 0
+        for row in range(rows):
+            for col in range(cols):
+                x = start_x + col * (card_width + 10)
+                y = start_y + row * (card_height + 10)
+               
+                card_data = card_list[card_index]
+                self.cards.append({
+                    'x': x,
+                    'y': y,
+                    'width': card_width,
+                    'height': card_height,
+                    'pair_id': card_data['pair_id'],
+                    'image_file': card_data['image_file'],
+                    'flipped': True,
+                    'matched': False,
+                    'card_image': ImageGenerator.load_image(
+                        card_data['image_file'],
+                        card_width,
+                        card_height
+                    )
+                })
+                card_index += 1
+   
+    def pause_game(self):
+        """Pause the game and freeze timer"""
+        self.paused = True
+        self.pause_time = pygame.time.get_ticks()
+   
+    def resume_game(self):
+        """Resume the game and adjust start time"""
+        if self.paused:
+            pause_duration = pygame.time.get_ticks() - self.pause_time
+            self.start_time += pause_duration
+            self.paused = False
+   
+    def handle_click(self, pos):
+        """Handle card clicks"""
+        if not self.can_click or self.flip_timer > 0:
+            return
+       
+        for card in self.cards:
+            if card['matched']:
+                continue
+           
+            card_rect = pygame.Rect(card['x'], card['y'], card['width'], card['height'])
+            if card_rect.collidepoint(pos):
+                if self.first_card is None:
+                    self.first_card = card
+                    card['flipped'] = False
+                    print(f"First card flipped: pair {card['pair_id']}")
+                elif self.second_card is None and card != self.first_card:
+                    self.second_card = card
+                    card['flipped'] = False
+                    print(f"Second card flipped: pair {card['pair_id']}")
+                    self.can_click = False
+                    self.flip_timer = 60  # 1 second at 60 FPS
+                break
+   
+    def handle_event(self, event):
+        pass
+   
+    def update(self) -> bool:
+        """Update game state"""
+        # Update timer
+        if not self.paused:
+            elapsed = (pygame.time.get_ticks() - self.start_time) // 1000
+            self.time_remaining = max(0, self.time_limit - elapsed)
+       
+        if self.flip_timer > 0:
+            self.flip_timer -= 1
+           
+            if self.flip_timer == 0:
+                # Check if cards match
+                if self.first_card and self.second_card:
+                    if self.first_card['pair_id'] == self.second_card['pair_id']:
+                        # Match found!
+                        self.first_card['matched'] = True
+                        self.second_card['matched'] = True
+                        self.matched_pairs += 1
+                        print(f"Match found! {self.matched_pairs}/{self.total_pairs}")
+                    else:
+                        # Wrong match - flip cards back
+                        self.first_card['flipped'] = True
+                        self.second_card['flipped'] = True
+                        print(f"Wrong match!")
+               
+                self.first_card = None
+                self.second_card = None
+                self.can_click = True
+       
+        # Check win condition
+        if self.matched_pairs >= self.total_pairs:
+            self.won = True
+            return True
+       
+        # Check lose condition (time ran out)
+        if self.time_remaining <= 0:
+            self.won = False
+            return True
+       
+        return False
+   
+    def draw(self, screen):
+        # Draw background image
+        screen.blit(self.game.level4_bg, (0, 0))
+       
+        # Draw cards
+        for card in self.cards:
+            card_rect = pygame.Rect(card['x'], card['y'], card['width'], card['height'])
+           
+            if card['flipped']:
+                # Draw back of card
+                if self.back_card_image:
+                    screen.blit(self.back_card_image, (card['x'], card['y']))
+                else:
+                    # Fallback placeholder back card
+                    pygame.draw.rect(screen, LIGHT_BROWN, card_rect, border_radius=4)
+                    pygame.draw.rect(screen, BROWN, card_rect, 2, border_radius=4)
+                    # Draw X pattern
+                    pygame.draw.line(screen, WHITE, (card['x'], card['y']),
+                                   (card['x'] + card['width'], card['y'] + card['height']), 1)
+                    pygame.draw.line(screen, WHITE, (card['x'], card['y'] + card['height']),
+                                   (card['x'] + card['width'], card['y']), 1)
+            else:
+                # Draw front of card (the image)
+                if card['card_image']:
+                    screen.blit(card['card_image'], (card['x'], card['y']))
+                else:
+                    # Fallback placeholder front card
+                    pygame.draw.rect(screen, GREEN, card_rect, border_radius=4)
+                    pygame.draw.rect(screen, DARK_RED, card_rect, 2, border_radius=4)
+                    text = self.game.font_tiny.render(f"Pair {card['pair_id']}", True, WHITE)
+                    screen.blit(text, (card['x'] + card['width']//2 - text.get_width()//2,
+                                      card['y'] + card['height']//2 - text.get_height()//2))
+           
+            # Highlight matched cards
+            if card['matched']:
+                pygame.draw.rect(screen, GOLD, card_rect, 3, border_radius=4)
+       
+        # HUD - Matched pairs
+        matched_text = self.game.font_small.render(
+            f"Matched: {self.matched_pairs}/{self.total_pairs}", True, GREEN)
+        screen.blit(matched_text, (30, 75))
+       
+        # HUD - Time remaining (format as MM:SS)
+        minutes = self.time_remaining // 60
+        seconds = self.time_remaining % 60
+        time_color = RED if self.time_remaining < 20 else BROWN
+        time_text = self.game.font_small.render(
+            f"Time: {minutes}:{seconds:02d}", True, time_color)
+        screen.blit(time_text, (SCREEN_WIDTH - 250, 75))
+
+
+class Level5_FireHiccups:
+    """Level 5: Tap fireballs (using fireball.png image) to catch them - 25 seconds timer"""
+    def __init__(self, game: LibraryGame):
+        self.game = game
+        self.fireballs = []
+        self.caught_fireballs = 0
+        self.fireballs_needed = 20
+        self.won = False
+        self.spawn_counter = 0
+        self.paused = False
+        self.pause_time = 0
+        self.time_limit = 25  # 25 SECONDS
+        self.time_remaining = self.time_limit
+        self.start_time = pygame.time.get_ticks()
+        self.fireball_img = ImageGenerator.load_image("fireball.png", 40, 40)
+       
+        print(f"Level 5 started: Catch {self.fireballs_needed} fireballs in {self.time_limit} seconds")
+   
+    def spawn_fireball(self):
+        """Spawn a fireball"""
+        x = random.randint(80, SCREEN_WIDTH - 80)
+        y = 40
+        vx = random.uniform(-1.5, 1.5)
+        vy = random.uniform(2.0, 3.0)
+       
+        self.fireballs.append({
+            'x': x, 'y': y, 'vx': vx, 'vy': vy, 'size': 20
+        })
+   
+    def pause_game(self):
+        """Pause the game and freeze timer"""
+        self.paused = True
+        self.pause_time = pygame.time.get_ticks()
+   
+    def resume_game(self):
+        """Resume the game and adjust start time"""
+        if self.paused:
+            pause_duration = pygame.time.get_ticks() - self.pause_time
+            self.start_time += pause_duration
+            self.paused = False
+   
+    def handle_click(self, pos):
+        """Check if fireball is tapped"""
+        for fireball in self.fireballs[:]:
+            dist = math.sqrt((pos[0] - fireball['x'])**2 +
+                            (pos[1] - fireball['y'])**2)
+            if dist < fireball['size'] + 15:
+                self.caught_fireballs += 1
+                self.fireballs.remove(fireball)
+                print(f"Fireball caught! {self.caught_fireballs}/{self.fireballs_needed}")
+                return
+   
+    def handle_event(self, event):
+        pass
+   
+    def update(self) -> bool:
+        # Update timer
+        if not self.paused:
+            elapsed = (pygame.time.get_ticks() - self.start_time) // 1000
+            self.time_remaining = max(0, self.time_limit - elapsed)
+       
+        if not self.paused:
+            self.spawn_counter += 1
+            if self.spawn_counter > 30:
+                self.spawn_fireball()
+                self.spawn_counter = 0
+           
+            fireballs_to_remove = []
+           
+            for i, fireball in enumerate(self.fireballs):
+                fireball['x'] += fireball['vx']
+                fireball['y'] += fireball['vy']
+               
+                # Check if fireball goes off screen
+                if fireball['y'] > SCREEN_HEIGHT:
+                    fireballs_to_remove.append(i)
+           
+            for i in sorted(fireballs_to_remove, reverse=True):
+                del self.fireballs[i]
+       
+        # Check win condition - caught all fireballs
+        if self.caught_fireballs >= self.fireballs_needed:
+            self.won = True
+            return True
+       
+        # Check lose condition - time ran out
+        if self.time_remaining <= 0:
+            self.won = False
+            return True
+       
+        return False
+   
+    def draw(self, screen):
+        screen.fill((220, 210, 180))
+       
+        title = self.game.font_large.render("Fire Hiccups!", True, BROWN)
+        screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 15))
+       
+        # Draw fireballs
+        for fireball in self.fireballs:
+            if self.fireball_img:
+                screen.blit(self.fireball_img,
+                           (int(fireball['x'] - fireball['size']),
+                            int(fireball['y'] - fireball['size'])))
+            else:
+                # Fallback placeholder fireball
+                pygame.draw.circle(screen, ORANGE, (int(fireball['x']), int(fireball['y'])),
+                                 fireball['size'])
+                pygame.draw.circle(screen, RED, (int(fireball['x']), int(fireball['y'])),
+                                 fireball['size'] - 2, 1)
+       
+        # HUD - Caught fireballs
+        caught_text = self.game.font_small.render(
+            f"Caught: {self.caught_fireballs}/{self.fireballs_needed}", True, GREEN)
+        screen.blit(caught_text, (30, 75))
+       
+        # HUD - Time remaining
+        time_color = RED if self.time_remaining < 10 else BROWN
+        time_text = self.game.font_small.render(
+            f"Time: {self.time_remaining}s", True, time_color)
+        screen.blit(time_text, (SCREEN_WIDTH - 250, 75))
+
+
+# Main
+if __name__ == "__main__":
+    game = LibraryGame()
+    game.run()
+
 
 pygame.quit()
 sys.exit()
